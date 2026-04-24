@@ -1,92 +1,170 @@
-# Cloudsnap
+# CloudSnap
 
+A serverless image management platform built on AWS. Upload images, get automatic AI-powered object detection, search by tags or by query image, browse your full library, and manage everything from a Next.js frontend — without managing a single server.
 
+Built as a portfolio project demonstrating production-grade AWS architecture: Terraform IaC, Cognito JWT auth, GitHub Actions CI/CD, distributed tracing, and full observability.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Features
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- **Upload** — drag-and-drop uploads to S3 (JPEG, PNG, GIF, WebP, up to 10 MB)
+- **Auto-tagging** — object detection runs automatically via AWS Rekognition on every upload
+- **Browse** — gallery view of all stored images with their detected tags
+- **Search by tags** — find images by object name and minimum detection count
+- **Reverse image search** — upload a query image to find visually similar stored images
+- **Tag management** — add custom tags or remove existing ones with a chip-based UI; tags pre-populated when browsing
+- **Delete** — removes an image from S3 and the database in a single action
+- **Authentication** — sign up, log in, and log out via AWS Cognito; every API route requires a valid JWT
 
-## Add your files
+---
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://git.infotech.monash.edu/fit5225-group27/cloudsnap.git
-git branch -M main
-git push -uf origin main
+Browser  ─────────────────────────────────────────────────────────────────
+ │  Next.js 14 · TypeScript · Tailwind CSS                                │
+ │  Hosted: CloudFront (CDN) → S3 (static export)                         │
+─┼───────────────────────────────────────────────────────────────────────
+ │
+ ├── AWS Cognito ───── user accounts, sign-up / login, JWT tokens
+ │
+ └── API Gateway HTTP API (JWT-protected, all routes)
+         │
+         ├── POST   /upload          → Lambda → S3 store image
+         │                                   → S3 event triggers object-detection Lambda
+         │                                   → Rekognition detects labels → DynamoDB
+         ├── GET    /images          → Lambda → DynamoDB  (browse full library)
+         ├── GET    /search          → Lambda → DynamoDB  (tag-based search)
+         ├── POST   /search-by-image → Lambda → Rekognition (visual similarity)
+         ├── POST   /modify-tags     → Lambda → DynamoDB  (add / remove tags)
+         └── DELETE /delete          → Lambda → S3 + DynamoDB (delete image)
+                                               │
+                                   ┌───────────┴───────────┐
+                                   S3                 DynamoDB
+                            (image files)         (metadata + tags)
+
+Monitoring:  CloudWatch (logs, dashboards, SNS email alerts)
+Tracing:     AWS X-Ray (across all Lambda functions)
+IaC:         Terraform (modules: storage, auth, compute, api, observability)
+CI/CD:       GitHub Actions (plan on PR · deploy on push to main)
 ```
 
-## Integrate with your tools
+---
 
-- [ ] [Set up project integrations](https://git.infotech.monash.edu/fit5225-group27/cloudsnap/-/settings/integrations)
+## Tech Stack
 
-## Collaborate with your team
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, AWS Amplify Auth |
+| Backend | Python 3.12, AWS Lambda |
+| Object storage | AWS S3 |
+| Database | AWS DynamoDB |
+| AI / ML | AWS Rekognition (object detection + visual similarity) |
+| Auth | AWS Cognito (user pool + JWT authorizer) |
+| API | AWS API Gateway v2 (HTTP) |
+| Infrastructure | Terraform |
+| CI/CD | GitHub Actions |
+| Observability | CloudWatch, AWS X-Ray |
+| Local dev | Docker, LocalStack |
+| Testing | pytest, moto |
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+---
 
-## Test and Deploy
+## Project Structure
 
-Use the built-in continuous integration in GitLab.
+```
+cloudsnap/
+├── backend/
+│   ├── upload/              # POST /upload — stores image to S3
+│   ├── list-images/         # GET  /images — lists all images with tags
+│   ├── search-tags/         # GET  /search — queries DynamoDB by tag
+│   ├── search-by-image/     # POST /search-by-image — visual similarity
+│   ├── modify-tags/         # POST /modify-tags — adds / removes tags
+│   ├── delete/              # DELETE /delete — removes image from S3 + DynamoDB
+│   └── object-detection/    # S3-triggered — Rekognition labels → DynamoDB
+├── frontend/
+│   ├── app/                 # Next.js App Router pages (login, signup, dashboard)
+│   ├── components/          # React components (GalleryTab, UploadTab, …)
+│   └── lib/                 # API client, Amplify auth helpers, TypeScript types
+├── infrastructure/
+│   ├── modules/
+│   │   ├── storage/         # S3 bucket + DynamoDB table
+│   │   ├── auth/            # Cognito user pool + app client
+│   │   ├── compute/         # Lambda functions + IAM roles
+│   │   ├── api/             # API Gateway + JWT authorizer + routes
+│   │   └── observability/   # CloudWatch dashboards, alarms, X-Ray
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── variables.tf
+│   ├── backend.tf           # Remote Terraform state (S3 + DynamoDB lock)
+│   └── terraform.tfvars.example
+├── tests/                   # pytest unit tests (moto mocks AWS)
+├── docker/                  # docker-compose with LocalStack
+├── .github/workflows/       # terraform.yml · deploy-backend.yml · deploy-frontend.yml
+├── Makefile                 # Shorthand for common commands
+├── SETUP.md                 # Full deployment walkthrough
+└── README.md
+```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+---
 
-***
+## Deploy to Your Own AWS Account
 
-# Editing this README
+See **[SETUP.md](SETUP.md)** for a complete step-by-step walkthrough — from creating an IAM user through a live public URL with GitHub Actions CI/CD.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+**Estimated cost:** $0–2/month at hobby scale. All services are either free-tier eligible or near-zero at low traffic.
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+---
 
-## Name
-Choose a self-explaining name for your project.
+## Local Development
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Frontend only
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local   # fill in your Terraform outputs
+npm run dev
+# open http://localhost:3000
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Full local stack (LocalStack + frontend)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop).
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+make local-up    # starts LocalStack + frontend dev server
+make local-down  # stops everything
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+---
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Tests
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+make test
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Uses **moto** to mock AWS — no real AWS calls, no cost, no credentials needed.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```
+tests/test_upload.py       .....
+tests/test_search_tags.py  ......
+tests/test_modify_tags.py  ......
+tests/test_delete.py       ....
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+====== 21 passed in 2.1s ======
+```
 
-## License
-For open source projects, say how it is licensed.
+---
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## CI/CD
+
+| Workflow | Trigger | What happens |
+|---|---|---|
+| `terraform.yml` | PR to `main` | Runs `terraform plan`, posts the diff as a PR comment |
+| `deploy-backend.yml` | Push to `main` (backend changed) | Runs tests → deploys updated Lambda functions |
+| `deploy-frontend.yml` | Push to `main` (frontend changed) | Builds Next.js → syncs to S3 → invalidates CloudFront |
+
+`terraform apply` (real infrastructure changes) requires manual approval via a GitHub **production** environment gate before it runs.

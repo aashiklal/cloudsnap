@@ -1,0 +1,9 @@
+variable "project_name"   { type = string }
+variable "environment"    { type = string }
+variable "aws_region"     { type = string }
+variable "bucket_name"    { type = string }
+variable "bucket_arn"     { type = string }
+variable "table_name"     { type = string }
+variable "table_arn"      { type = string }
+variable "allowed_origin" { type = string }
+variable "lambda_runtime" { type = string }

@@ -1,0 +1,32 @@
+services:
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,dynamodb,lambda,sqs
+      - DEBUG=0
+      - LAMBDA_EXECUTOR=local
+    volumes:
+      - ./localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh
+      - localstack-data:/var/lib/localstack
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../frontend/.env.local
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4566
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - localstack
+
+volumes:
+  localstack-data:

@@ -1,0 +1,103 @@
+import json
+import os
+import logging
+from urllib.parse import urlparse
+import boto3
+from botocore.exceptions import ClientError
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+BUCKET_NAME = os.environ['BUCKET_NAME']
+TABLE_NAME = os.environ['TABLE_NAME']
+ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', '*')
+
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,DELETE',
+}
+
+s3_client = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
+
+
+def lambda_handler(event, context):
+    if event.get('httpMethod') == 'OPTIONS' or event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
+
+    image_url = (event.get('queryStringParameters') or {}).get('image_url', '')
+
+    if not image_url:
+        return _error(400, 'Missing required parameter: image_url')
+
+    # Validate the URL is a legitimate S3 URL for our bucket to prevent injection
+    image_key = _extract_s3_key(image_url)
+    if image_key is None:
+        return _error(400, 'Invalid image URL: must be a valid S3 URL for this bucket')
+
+    table = dynamodb.Table(TABLE_NAME)
+    s3_exists = False
+    dynamodb_exists = False
+
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=image_key)
+        s3_exists = True
+    except ClientError:
+        pass
+
+    try:
+        response = table.get_item(Key={'ImageURL': image_url})
+        if 'Item' in response:
+            dynamodb_exists = True
+    except ClientError:
+        pass
+
+    if not s3_exists and not dynamodb_exists:
+        return _error(404, 'Image not found in S3 or database')
+
+    deleted_from = []
+    try:
+        if s3_exists:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=image_key)
+            deleted_from.append('S3')
+        if dynamodb_exists:
+            table.delete_item(Key={'ImageURL': image_url})
+            deleted_from.append('database')
+    except ClientError as e:
+        logger.error({'action': 'delete', 'error': str(e)})
+        return _error(500, f'Error deleting image: {e}')
+
+    logger.info({'action': 'delete', 'image_url': image_url, 'deleted_from': deleted_from})
+
+    return {
+        'statusCode': 200,
+        'headers': CORS_HEADERS,
+        'body': json.dumps({'message': f'Successfully deleted image from {" and ".join(deleted_from)}'}),
+    }
+
+
+def _extract_s3_key(url: str) -> str | None:
+    """Return the S3 object key if the URL belongs to our bucket, else None."""
+    try:
+        parsed = urlparse(url)
+        # Accept both path-style and virtual-hosted-style S3 URLs
+        host = parsed.netloc
+        if host == f'{BUCKET_NAME}.s3.amazonaws.com' or host.startswith('s3.amazonaws.com'):
+            key = parsed.path.lstrip('/')
+            # Strip bucket name prefix from path-style URLs
+            if host.startswith('s3.amazonaws.com') and key.startswith(f'{BUCKET_NAME}/'):
+                key = key[len(BUCKET_NAME) + 1:]
+            if key:
+                return key
+    except Exception:
+        pass
+    return None
+
+
+def _error(status: int, message: str) -> dict:
+    return {
+        'statusCode': status,
+        'headers': CORS_HEADERS,
+        'body': json.dumps({'error': message}),
+    }
