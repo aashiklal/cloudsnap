@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { getAuthToken } from '@/lib/auth';
 import { modifyTags } from '@/lib/api';
 import type { Tag, SelectedImage } from '@/lib/types';
 
@@ -52,8 +51,7 @@ export function ModifyTagsTab({ onResult, setLoading, selectedImage, onClearSele
     setLoading(true);
     setError('');
     try {
-      const token = await getAuthToken();
-      const result = await modifyTags(imageUrl, action === 'add' ? '1' : '0', tagInputs, token);
+      const result = await modifyTags(imageUrl, action === 'add' ? '1' : '0', tagInputs);
       onResult(result.message);
       setNewTags(['']);
       setTagsToRemove(new Set());

@@ -65,7 +65,7 @@ resource "aws_xray_sampling_rule" "cloudsnap" {
   rule_name      = "${var.project_name}-${var.environment}"
   priority       = 1000
   reservoir_size = 5
-  fixed_rate     = 0.05
+  fixed_rate     = 0.10
   url_path       = "*"
   host           = "*"
   http_method    = "*"

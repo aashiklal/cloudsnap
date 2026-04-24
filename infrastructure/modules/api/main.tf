@@ -57,7 +57,7 @@ resource "aws_apigatewayv2_route" "lambda" {
 
 resource "aws_cloudwatch_log_group" "api_access" {
   name              = "/aws/apigateway/${var.project_name}-${var.environment}"
-  retention_in_days = 14
+  retention_in_days = 30
 }
 
 resource "aws_apigatewayv2_stage" "prod" {
@@ -80,8 +80,8 @@ resource "aws_apigatewayv2_stage" "prod" {
   }
 
   default_route_settings {
-    throttling_burst_limit = 100
-    throttling_rate_limit  = 50
+    throttling_burst_limit = 500
+    throttling_rate_limit  = 200
   }
 }
 

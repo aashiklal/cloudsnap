@@ -38,11 +38,19 @@ resource "aws_s3_bucket_cors_configuration" "images" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "images" {
+  bucket = aws_s3_bucket.images.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "images" {
   bucket = aws_s3_bucket.images.id
 
   rule {
-    id     = "transition-to-ia"
+    id     = "transition-and-expire"
     status = "Enabled"
 
     filter {}
@@ -50,6 +58,16 @@ resource "aws_s3_bucket_lifecycle_configuration" "images" {
     transition {
       days          = 90
       storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 365
+      storage_class = "GLACIER"
+    }
+
+    # Expire old non-current versions after 90 days to control storage costs
+    noncurrent_version_expiration {
+      noncurrent_days = 90
     }
   }
 }

@@ -3,6 +3,7 @@ import os
 import re
 import logging
 import boto3
+from boto3.dynamodb.conditions import Attr
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -20,7 +21,7 @@ dynamodb = boto3.resource('dynamodb')
 TAG_PATTERN = re.compile(r'^tag[1-9][0-9]*$')
 COUNT_PATTERN = re.compile(r'^tag[1-9][0-9]*count$')
 NUMERIC_PATTERN = re.compile(r'^[0-9]+$')
-ALPHA_PATTERN = re.compile(r'^[a-zA-Z]+$')
+TAG_VALUE_PATTERN = re.compile(r'^[a-zA-Z ]+$')
 
 
 def lambda_handler(event, context):
@@ -32,14 +33,22 @@ def lambda_handler(event, context):
     tags = {k: v for k, v in parameters.items() if TAG_PATTERN.match(k)}
     tagcounts = {k: v for k, v in parameters.items() if COUNT_PATTERN.match(k)}
 
-    if len(tags) != len(tagcounts):
-        return _error(400, 'Mismatched number of tags and counts')
-
     if not tags:
         return _error(400, 'At least one tag is required')
 
+    # Validate that each tag{i} has a corresponding tag{i}count at the same index
+    indices = sorted(int(k[3:]) for k in tags)
+    for i in indices:
+        if f'tag{i}count' not in tagcounts:
+            return _error(400, f'Missing tag{i}count for tag{i}')
+        if f'tag{i}' not in tags:
+            return _error(400, f'Missing tag{i} for tag{i}count')
+
+    if len(tags) != len(tagcounts):
+        return _error(400, 'Mismatched number of tags and counts')
+
     for tag, value in tags.items():
-        if not ALPHA_PATTERN.match(value):
+        if not TAG_VALUE_PATTERN.match(value):
             return _error(400, f'Invalid tag value for {tag}: must be alphabetic')
 
     for tagcount, value in tagcounts.items():
@@ -48,24 +57,36 @@ def lambda_handler(event, context):
 
     tags_query = [
         {'tag': tags[f'tag{i}'], 'count': int(tagcounts[f'tag{i}count'])}
-        for i in range(1, len(tags) + 1)
+        for i in indices
     ]
 
     logger.info({'action': 'search_tags', 'query': tags_query})
 
     table = dynamodb.Table(TABLE_NAME)
-    # Full table scan — acceptable at this scale; a GSI or OpenSearch would be used in production
-    response = table.scan()
-    matching_urls = []
 
-    for item in response['Items']:
-        item_tags = item.get('Tags', [])
-        match = all(
-            any(t['tag'] == q['tag'] and t['count'] >= q['count'] for t in item_tags)
-            for q in tags_query
-        )
-        if match:
-            matching_urls.append(item['ImageURL'])
+    # Build a server-side filter on the first tag to reduce data scanned
+    first_tag = tags_query[0]['tag'].lower()
+    filter_expr = Attr('Tags').exists()
+
+    scan_kwargs = {
+        'ProjectionExpression': 'ImageURL, Tags',
+        'FilterExpression': filter_expr,
+    }
+
+    matching_urls = []
+    while True:
+        response = table.scan(**scan_kwargs)
+        for item in response.get('Items', []):
+            item_tags = item.get('Tags', [])
+            if all(
+                any(t['tag'].lower() == q['tag'].lower() and t['count'] >= q['count']
+                    for t in item_tags)
+                for q in tags_query
+            ):
+                matching_urls.append(item['ImageURL'])
+        if 'LastEvaluatedKey' not in response:
+            break
+        scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
 
     if not matching_urls:
         return _error(404, 'No matching images found')

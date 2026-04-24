@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import os
 import logging
+from typing import Optional
 from urllib.parse import urlparse
 import boto3
 from botocore.exceptions import ClientError
@@ -77,7 +80,7 @@ def lambda_handler(event, context):
     }
 
 
-def _extract_s3_key(url: str) -> str | None:
+def _extract_s3_key(url: str) -> Optional[str]:
     """Return the S3 object key if the URL belongs to our bucket, else None."""
     try:
         parsed = urlparse(url)

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { getAuthToken } from '@/lib/auth';
 import { uploadImage } from '@/lib/api';
 
 type Props = { onResult: (r: string[] | string) => void; setLoading: (v: boolean) => void };
@@ -30,9 +29,7 @@ export function UploadTab({ onResult, setLoading }: Props) {
     setLoading(true);
     setError('');
     try {
-      const token = await getAuthToken();
-      const base64 = await fileToBase64(file);
-      const result = await uploadImage(base64, file.name, token);
+      const result = await uploadImage(file);
       onResult(result.url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -71,13 +68,4 @@ export function UploadTab({ onResult, setLoading }: Props) {
       </button>
     </form>
   );
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }

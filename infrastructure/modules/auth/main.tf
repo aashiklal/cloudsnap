@@ -2,11 +2,11 @@ resource "aws_cognito_user_pool" "cloudsnap" {
   name = "${var.project_name}-users-${var.environment}"
 
   password_policy {
-    minimum_length                   = 8
+    minimum_length                   = 12
     require_lowercase                = true
     require_uppercase                = true
     require_numbers                  = true
-    require_symbols                  = false
+    require_symbols                  = true
     temporary_password_validity_days = 7
   }
 
@@ -54,8 +54,8 @@ resource "aws_cognito_user_pool_client" "web" {
     refresh_token = "days"
   }
 
-  access_token_validity  = 1
-  id_token_validity      = 1
+  access_token_validity  = 4
+  id_token_validity      = 4
   refresh_token_validity = 30
 }
 

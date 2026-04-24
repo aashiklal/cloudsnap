@@ -9,6 +9,7 @@ import { ReverseSearchTab } from '@/components/ReverseSearchTab';
 import { ModifyTagsTab } from '@/components/ModifyTagsTab';
 import { DeleteTab } from '@/components/DeleteTab';
 import { ResultsPanel } from '@/components/ResultsPanel';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'upload', label: 'Upload' },
@@ -56,38 +57,40 @@ export default function DashboardPage() {
         </nav>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        {activeTab === 'upload' && (
-          <UploadTab onResult={setResult} setLoading={setIsLoading} />
-        )}
-        {activeTab === 'gallery' && (
-          <GalleryTab
-            onManage={(img, action) => navigate(action === 'modify' ? 'modify' : 'delete', img)}
-          />
-        )}
-        {activeTab === 'search' && (
-          <SearchTagsTab onResult={setResult} setLoading={setIsLoading} />
-        )}
-        {activeTab === 'reverse' && (
-          <ReverseSearchTab onResult={setResult} setLoading={setIsLoading} />
-        )}
-        {activeTab === 'modify' && (
-          <ModifyTagsTab
-            onResult={setResult}
-            setLoading={setIsLoading}
-            selectedImage={selectedImage ?? undefined}
-            onClearSelection={() => setSelectedImage(null)}
-          />
-        )}
-        {activeTab === 'delete' && (
-          <DeleteTab
-            onResult={setResult}
-            setLoading={setIsLoading}
-            selectedImage={selectedImage ?? undefined}
-            onClearSelection={() => setSelectedImage(null)}
-          />
-        )}
-      </div>
+      <ErrorBoundary>
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          {activeTab === 'upload' && (
+            <UploadTab onResult={setResult} setLoading={setIsLoading} />
+          )}
+          {activeTab === 'gallery' && (
+            <GalleryTab
+              onManage={(img, action) => navigate(action === 'modify' ? 'modify' : 'delete', img)}
+            />
+          )}
+          {activeTab === 'search' && (
+            <SearchTagsTab onResult={setResult} setLoading={setIsLoading} />
+          )}
+          {activeTab === 'reverse' && (
+            <ReverseSearchTab onResult={setResult} setLoading={setIsLoading} />
+          )}
+          {activeTab === 'modify' && (
+            <ModifyTagsTab
+              onResult={setResult}
+              setLoading={setIsLoading}
+              selectedImage={selectedImage ?? undefined}
+              onClearSelection={() => setSelectedImage(null)}
+            />
+          )}
+          {activeTab === 'delete' && (
+            <DeleteTab
+              onResult={setResult}
+              setLoading={setIsLoading}
+              selectedImage={selectedImage ?? undefined}
+              onClearSelection={() => setSelectedImage(null)}
+            />
+          )}
+        </div>
+      </ErrorBoundary>
 
       <ResultsPanel
         result={result}

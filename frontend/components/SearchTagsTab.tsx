@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { getAuthToken } from '@/lib/auth';
 import { searchByTags } from '@/lib/api';
 import type { TagInput } from '@/lib/types';
 
@@ -30,8 +29,7 @@ export function SearchTagsTab({ onResult, setLoading }: Props) {
     setLoading(true);
     setError('');
     try {
-      const token = await getAuthToken();
-      const results = await searchByTags(valid, token);
+      const results = await searchByTags(valid);
       onResult(results);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Search failed');

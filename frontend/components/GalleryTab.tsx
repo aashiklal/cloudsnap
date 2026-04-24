@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { getAuthToken } from '@/lib/auth';
+import useSWR from 'swr';
 import { listImages } from '@/lib/api';
 import type { ImageRecord, SelectedImage } from '@/lib/types';
 
@@ -11,26 +10,16 @@ type Props = {
 };
 
 export function GalleryTab({ onManage }: Props) {
-  const [images, setImages] = useState<ImageRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = await getAuthToken();
-        const data = await listImages(token);
-        setImages(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load images');
-      } finally {
-        setLoading(false);
-      }
+  const { data: images, error, isLoading, mutate } = useSWR(
+    'images',
+    () => listImages(),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30_000, // cache for 30 seconds
     }
-    load();
-  }, []);
+  );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-gray-500">
         <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -40,10 +29,20 @@ export function GalleryTab({ onManage }: Props) {
   }
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-red-600">{error instanceof Error ? error.message : 'Failed to load images'}</p>
+        <button
+          onClick={() => mutate()}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
-  if (images.length === 0) {
+  if (!images || images.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
         <p className="text-sm">No images yet. Upload one to get started.</p>
@@ -53,7 +52,15 @@ export function GalleryTab({ onManage }: Props) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-500">{images.length} image{images.length !== 1 ? 's' : ''}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-500">{images.length} image{images.length !== 1 ? 's' : ''}</p>
+        <button
+          onClick={() => mutate()}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          Refresh
+        </button>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((img) => (
           <GalleryCard key={img.ImageURL} image={img} onManage={onManage} />

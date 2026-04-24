@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { getAuthToken } from '@/lib/auth';
 import { deleteImage } from '@/lib/api';
 import type { SelectedImage } from '@/lib/types';
 
@@ -25,8 +24,7 @@ export function DeleteTab({ onResult, setLoading, selectedImage, onClearSelectio
     setError('');
     setConfirming(false);
     try {
-      const token = await getAuthToken();
-      const result = await deleteImage(imageUrl, token);
+      const result = await deleteImage(imageUrl);
       onResult(result.message);
       setManualUrl('');
       onClearSelection?.();

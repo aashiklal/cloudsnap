@@ -8,6 +8,7 @@ on:
     paths: ['infrastructure/**']
 
 permissions:
+  id-token: write   # required for OIDC
   contents: read
   pull-requests: write
 
@@ -27,11 +28,10 @@ jobs:
         with:
           terraform_version: "1.7.x"
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-southeast-2
 
       - name: Terraform Init
@@ -45,6 +45,13 @@ jobs:
         run: terraform plan -no-color -out=tfplan
         continue-on-error: true
 
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infrastructure/tfplan
+          retention-days: 5
+
       - name: Post plan to PR
         uses: actions/github-script@v7
         with:
@@ -56,7 +63,9 @@ jobs:
             ${{ steps.plan.outputs.stdout }}
             \`\`\`
 
-            </details>`;
+            </details>
+
+            > Plan artifact uploaded. A maintainer must approve the \`production\` environment before apply runs.`;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -72,7 +81,7 @@ jobs:
     name: Terraform Apply
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production
+    environment: production   # requires manual approval in GitHub repo settings
     defaults:
       run:
         working-directory: infrastructure
@@ -84,15 +93,17 @@ jobs:
         with:
           terraform_version: "1.7.x"
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-southeast-2
 
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Plan
+        run: terraform plan -no-color -out=tfplan
+
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply tfplan

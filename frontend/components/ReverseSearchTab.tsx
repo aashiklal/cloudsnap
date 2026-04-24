@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { getAuthToken } from '@/lib/auth';
 import { searchByImage } from '@/lib/api';
 
 type Props = { onResult: (r: string[] | string) => void; setLoading: (v: boolean) => void };
@@ -18,9 +17,7 @@ export function ReverseSearchTab({ onResult, setLoading }: Props) {
     setError('');
     setLoading(true);
     try {
-      const token = await getAuthToken();
-      const base64 = await fileToBase64(file);
-      const results = await searchByImage(base64, token);
+      const results = await searchByImage(file);
       onResult(results);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -47,13 +44,4 @@ export function ReverseSearchTab({ onResult, setLoading }: Props) {
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }

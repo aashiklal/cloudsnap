@@ -40,14 +40,14 @@ infrastructure/modules/compute/builds/
 *.zip
 
 # Lambda bundled dependencies extracted locally (object-detection, search-by-image)
-backend/object-detection/numpy/
+backend/object-detection/numpy*/
 backend/object-detection/numpy.libs/
 backend/object-detection/cv2/
 backend/object-detection/opencv_python_headless*/
 backend/object-detection/__MACOSX/
 backend/object-detection/*.weights
 backend/object-detection/*.so
-backend/search-by-image/numpy/
+backend/search-by-image/numpy*/
 backend/search-by-image/numpy.libs/
 backend/search-by-image/cv2/
 backend/search-by-image/opencv_python_headless*/

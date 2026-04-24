@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import logging
 import boto3
 
@@ -16,6 +17,7 @@ CORS_HEADERS = {
 }
 
 dynamodb = boto3.resource('dynamodb')
+TAG_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9 _-]{1,64}$')
 
 
 def lambda_handler(event, context):
@@ -58,8 +60,16 @@ def lambda_handler(event, context):
             if count_key not in body:
                 return _error(400, f'Missing {count_key} for {tag_key}')
 
-            tag_name = str(body[tag_key])
-            count = int(body[count_key])
+            tag_name = str(body[tag_key]).strip()
+            if not TAG_NAME_PATTERN.match(tag_name):
+                return _error(400, f'Invalid tag name "{tag_name}": use letters, numbers, spaces, hyphens, underscores (max 64 chars)')
+
+            try:
+                count = int(body[count_key])
+            except (ValueError, TypeError):
+                return _error(400, f'{count_key} must be an integer')
+            if count < 1:
+                return _error(400, f'{count_key} must be at least 1')
 
             for idx, tag in enumerate(item['Tags']):
                 if tag['tag'] == tag_name:

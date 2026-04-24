@@ -170,7 +170,7 @@ resource "aws_iam_role_policy" "lambda_custom" {
 resource "aws_cloudwatch_log_group" "lambda" {
   for_each          = local.functions
   name              = "/aws/lambda/${var.project_name}-${each.key}-${var.environment}"
-  retention_in_days = 14
+  retention_in_days = 30
 }
 
 # Lambda functions
@@ -198,8 +198,8 @@ resource "aws_lambda_function" "cloudsnap" {
   role          = aws_iam_role.lambda[each.key].arn
   handler       = each.value.handler
   runtime       = var.lambda_runtime
-  timeout       = each.key == "object-detection" || each.key == "search-by-image" ? 60 : 30
-  memory_size   = each.key == "object-detection" || each.key == "search-by-image" ? 512 : 256
+  timeout       = each.key == "object-detection" || each.key == "search-by-image" ? 120 : 30
+  memory_size   = each.key == "object-detection" || each.key == "search-by-image" ? 1024 : 256
 
   s3_bucket        = var.bucket_name
   s3_key           = aws_s3_object.lambda_package[each.key].key
@@ -221,6 +221,15 @@ resource "aws_lambda_function" "cloudsnap" {
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+# Provisioned concurrency for CV-heavy functions to eliminate cold starts
+resource "aws_lambda_provisioned_concurrency_config" "cv_functions" {
+  for_each = toset(["object-detection", "search-by-image"])
+
+  function_name                  = aws_lambda_function.cloudsnap[each.key].function_name
+  qualifier                      = aws_lambda_function.cloudsnap[each.key].version
+  provisioned_concurrent_executions = 2
 }
 
 # Allow object-detection Lambda to send failed events to its DLQ
