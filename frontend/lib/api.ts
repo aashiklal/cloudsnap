@@ -61,11 +61,15 @@ export async function searchByTags(tags: TagInput[]): Promise<SearchResult[]> {
 }
 
 export async function searchByImage(file: File): Promise<SearchResult[]> {
-  const form = new FormData();
-  form.append('file', file, file.name);
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const imageFile = btoa(binary);
   return request<SearchResult[]>('/search-by-image', {
     method: 'POST',
-    body: form,
+    body: JSON.stringify({ imageFile }),
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
