@@ -1,7 +1,7 @@
 import json
 import sys
 import pytest
-from tests.conftest import BUCKET_NAME
+from tests.conftest import BUCKET_NAME, USER_ID
 
 
 def _handler():
@@ -12,7 +12,10 @@ def _handler():
 
 
 def _event(image_url):
-    return {'queryStringParameters': {'image_url': image_url}}
+    return {
+        'queryStringParameters': {'image_url': image_url},
+        'requestContext': {'authorizer': {'jwt': {'claims': {'sub': USER_ID}}}},
+    }
 
 
 def _seed_s3(s3, key):
@@ -20,7 +23,7 @@ def _seed_s3(s3, key):
 
 
 def _seed_ddb(table, url):
-    table.put_item(Item={'ImageURL': url, 'Tags': []})
+    table.put_item(Item={'ImageURL': url, 'Tags': [], 'UserID': USER_ID, 'UploadedAt': '2024-01-01T00:00:00Z'})
 
 
 def test_delete_from_both(aws_resources):

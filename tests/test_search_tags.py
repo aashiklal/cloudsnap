@@ -1,7 +1,7 @@
 import json
 import sys
 import pytest
-from tests.conftest import TABLE_NAME
+from tests.conftest import TABLE_NAME, USER_ID
 
 
 def _handler():
@@ -13,11 +13,14 @@ def _handler():
 
 
 def _event(params):
-    return {'queryStringParameters': params}
+    return {
+        'queryStringParameters': params,
+        'requestContext': {'authorizer': {'jwt': {'claims': {'sub': USER_ID}}}},
+    }
 
 
 def _seed(table, url, tags):
-    table.put_item(Item={'ImageURL': url, 'Tags': tags})
+    table.put_item(Item={'ImageURL': url, 'Tags': tags, 'UserID': USER_ID, 'UploadedAt': '2024-01-01T00:00:00Z'})
 
 
 def test_search_returns_matching_image(aws_resources):
@@ -25,7 +28,8 @@ def test_search_returns_matching_image(aws_resources):
     handler = _handler()
     resp = handler(_event({'tag1': 'cat', 'tag1count': '2'}), {})
     assert resp['statusCode'] == 200
-    assert 'https://example.com/cat.jpg' in json.loads(resp['body'])
+    results = json.loads(resp['body'])
+    assert any(r['imageUrl'] == 'https://example.com/cat.jpg' for r in results)
 
 
 def test_search_count_too_high_no_match(aws_resources):
@@ -55,5 +59,5 @@ def test_search_no_params(aws_resources):
 
 def test_search_invalid_tag_value(aws_resources):
     handler = _handler()
-    resp = handler(_event({'tag1': 'cat123', 'tag1count': '2'}), {})
+    resp = handler(_event({'tag1': 'inv@lid!', 'tag1count': '2'}), {})
     assert resp['statusCode'] == 400

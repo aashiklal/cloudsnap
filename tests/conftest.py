@@ -8,6 +8,7 @@ REGION = 'ap-southeast-2'
 BUCKET_NAME = 'test-cloudsnap-bucket'
 TABLE_NAME = 'test-cloudsnap-table'
 ALLOWED_ORIGIN = 'http://localhost:3000'
+USER_ID = 'test-user'
 
 # Minimal valid JPEG (2x2 white pixels)
 VALID_JPEG_B64 = base64.b64encode(
@@ -44,7 +45,21 @@ def aws_resources():
         table = ddb.create_table(
             TableName=TABLE_NAME,
             KeySchema=[{'AttributeName': 'ImageURL', 'KeyType': 'HASH'}],
-            AttributeDefinitions=[{'AttributeName': 'ImageURL', 'AttributeType': 'S'}],
+            AttributeDefinitions=[
+                {'AttributeName': 'ImageURL', 'AttributeType': 'S'},
+                {'AttributeName': 'UserID', 'AttributeType': 'S'},
+                {'AttributeName': 'UploadedAt', 'AttributeType': 'S'},
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    'IndexName': 'UserID-UploadedAt-index',
+                    'KeySchema': [
+                        {'AttributeName': 'UserID', 'KeyType': 'HASH'},
+                        {'AttributeName': 'UploadedAt', 'KeyType': 'RANGE'},
+                    ],
+                    'Projection': {'ProjectionType': 'ALL'},
+                }
+            ],
             BillingMode='PAY_PER_REQUEST',
         )
         yield {'s3': s3, 'table': table}

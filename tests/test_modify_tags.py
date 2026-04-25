@@ -1,6 +1,7 @@
 import json
 import sys
 import pytest
+from tests.conftest import USER_ID
 
 
 def _handler():
@@ -11,11 +12,14 @@ def _handler():
 
 
 def _event(body):
-    return {'body': json.dumps(body)}
+    return {
+        'body': json.dumps(body),
+        'requestContext': {'authorizer': {'jwt': {'claims': {'sub': USER_ID}}}},
+    }
 
 
 def _seed(table, url, tags):
-    table.put_item(Item={'ImageURL': url, 'Tags': tags})
+    table.put_item(Item={'ImageURL': url, 'Tags': tags, 'UserID': USER_ID, 'UploadedAt': '2024-01-01T00:00:00Z'})
 
 
 def test_add_tag_increments_count(aws_resources):

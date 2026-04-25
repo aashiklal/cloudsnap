@@ -60,3 +60,7 @@ secrets.json
 *.log
 *.tmp
 *.bak
+
+# Test coverage
+.coverage
+htmlcov/

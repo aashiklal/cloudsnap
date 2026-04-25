@@ -21,6 +21,7 @@ CORS_HEADERS = {
 
 dynamodb = boto3.resource('dynamodb')
 rekognition = boto3.client('rekognition')
+s3 = boto3.client('s3')
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # match upload limit
 
