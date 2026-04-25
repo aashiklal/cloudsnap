@@ -81,17 +81,19 @@ function GalleryCard({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const filename = image.ImageURL.split('/').pop() ?? image.ImageURL;
 
   async function handleDelete() {
     setDeleting(true);
+    setDeleteError('');
     try {
       await deleteImage(image.ImageURL);
       onDeleted();
-    } catch {
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Delete failed');
       setDeleting(false);
-      setConfirming(false);
     }
   }
 
@@ -127,6 +129,9 @@ function GalleryCard({
       {confirming ? (
         <div className="p-2 bg-red-50 border-t border-red-100 space-y-2">
           <p className="text-xs text-red-700 font-medium">Delete this image?</p>
+          {deleteError && (
+            <p className="text-xs text-red-600 bg-red-100 rounded px-2 py-1">{deleteError}</p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={handleDelete}

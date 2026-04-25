@@ -42,38 +42,26 @@ def lambda_handler(event, context):
         return _error(400, 'Invalid image URL: must be a valid S3 URL for this bucket')
 
     table = dynamodb.Table(TABLE_NAME)
-    s3_exists = False
-    dynamodb_exists = False
-    item = None
-
-    try:
-        s3_client.head_object(Bucket=BUCKET_NAME, Key=image_key)
-        s3_exists = True
-    except ClientError:
-        pass
 
     try:
         response = table.get_item(Key={'ImageURL': image_url})
-        if 'Item' in response:
-            dynamodb_exists = True
-            item = response['Item']
-    except ClientError:
-        pass
+        item = response.get('Item')
+    except ClientError as e:
+        logger.error({'action': 'delete', 'error': str(e)})
+        return _error(500, f'Database error: {e}')
 
-    if not s3_exists and not dynamodb_exists:
-        return _error(404, 'Image not found in S3 or database')
+    if item is None:
+        return _error(404, 'Image not found in database')
 
-    if item and item.get('UserID') != user_id:
+    if item.get('UserID') != user_id:
         return _error(403, 'You do not have permission to delete this image')
 
     deleted_from = []
     try:
-        if s3_exists:
-            s3_client.delete_object(Bucket=BUCKET_NAME, Key=image_key)
-            deleted_from.append('S3')
-        if dynamodb_exists:
-            table.delete_item(Key={'ImageURL': image_url})
-            deleted_from.append('database')
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=image_key)
+        deleted_from.append('S3')
+        table.delete_item(Key={'ImageURL': image_url})
+        deleted_from.append('database')
     except ClientError as e:
         logger.error({'action': 'delete', 'error': str(e)})
         return _error(500, f'Error deleting image: {e}')
