@@ -29,12 +29,14 @@ def lambda_handler(event, context):
     if event.get('httpMethod') == 'OPTIONS' or event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
 
+    claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+    user_id = claims.get('sub', 'unknown')
+
     image_url = (event.get('queryStringParameters') or {}).get('image_url', '')
 
     if not image_url:
         return _error(400, 'Missing required parameter: image_url')
 
-    # Validate the URL is a legitimate S3 URL for our bucket to prevent injection
     image_key = _extract_s3_key(image_url)
     if image_key is None:
         return _error(400, 'Invalid image URL: must be a valid S3 URL for this bucket')
@@ -42,6 +44,7 @@ def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     s3_exists = False
     dynamodb_exists = False
+    item = None
 
     try:
         s3_client.head_object(Bucket=BUCKET_NAME, Key=image_key)
@@ -53,11 +56,15 @@ def lambda_handler(event, context):
         response = table.get_item(Key={'ImageURL': image_url})
         if 'Item' in response:
             dynamodb_exists = True
+            item = response['Item']
     except ClientError:
         pass
 
     if not s3_exists and not dynamodb_exists:
         return _error(404, 'Image not found in S3 or database')
+
+    if item and item.get('UserID') != user_id:
+        return _error(403, 'You do not have permission to delete this image')
 
     deleted_from = []
     try:
@@ -84,15 +91,14 @@ def _extract_s3_key(url: str) -> Optional[str]:
     """Return the S3 object key if the URL belongs to our bucket, else None."""
     try:
         parsed = urlparse(url)
-        # Accept both path-style and virtual-hosted-style S3 URLs
         host = parsed.netloc
+        # Strip query strings before extracting the key
+        path = parsed.path.split('?')[0].lstrip('/')
         if host == f'{BUCKET_NAME}.s3.amazonaws.com' or host.startswith('s3.amazonaws.com'):
-            key = parsed.path.lstrip('/')
-            # Strip bucket name prefix from path-style URLs
-            if host.startswith('s3.amazonaws.com') and key.startswith(f'{BUCKET_NAME}/'):
-                key = key[len(BUCKET_NAME) + 1:]
-            if key:
-                return key
+            if host.startswith('s3.amazonaws.com') and path.startswith(f'{BUCKET_NAME}/'):
+                path = path[len(BUCKET_NAME) + 1:]
+            if path:
+                return path
     except Exception:
         pass
     return None

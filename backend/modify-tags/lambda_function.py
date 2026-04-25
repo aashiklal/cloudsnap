@@ -25,6 +25,9 @@ def lambda_handler(event, context):
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
 
     try:
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        user_id = claims.get('sub', 'unknown')
+
         body = json.loads(event.get('body') or '{}')
         image_url = body.get('url')
         action_type_raw = body.get('type')
@@ -49,14 +52,22 @@ def lambda_handler(event, context):
             return _error(404, 'Image not found')
 
         item = response['Item']
+
+        if item.get('UserID') != user_id:
+            return _error(403, 'You do not have permission to modify this image')
+
+        # Dynamically detect which tag indices are present in the request body
+        indices = sorted({
+            int(re.search(r'\d+', k).group())
+            for k in body if re.match(r'^tag\d+$', k)
+        })
+
         indices_to_remove = []
 
-        for i in range(1, 11):
+        for i in indices:
             tag_key = f'tag{i}'
             count_key = f'tag{i}count'
 
-            if tag_key not in body:
-                continue
             if count_key not in body:
                 return _error(400, f'Missing {count_key} for {tag_key}')
 
@@ -72,7 +83,7 @@ def lambda_handler(event, context):
                 return _error(400, f'{count_key} must be at least 1')
 
             for idx, tag in enumerate(item['Tags']):
-                if tag['tag'] == tag_name:
+                if tag['tag'].lower() == tag_name.lower():
                     if action_type == 1:
                         tag['count'] += count
                     else:
