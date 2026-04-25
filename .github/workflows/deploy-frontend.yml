@@ -95,8 +95,8 @@ jobs:
             --exclude "*.html" \
             --no-cli-pager
           aws s3 sync frontend/out/ s3://${{ secrets.FRONTEND_BUCKET }} \
-            --delete \
             --cache-control "no-cache" \
+            --exclude "*" \
             --include "*.html" \
             --no-cli-pager
 

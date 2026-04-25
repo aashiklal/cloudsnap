@@ -60,12 +60,41 @@ export async function searchByTags(tags: TagInput[]): Promise<SearchResult[]> {
   return request<SearchResult[]>(`/search?${params.toString()}`, { method: 'GET' });
 }
 
+// Lambda payload limit is 6 MB; base64 adds ~33% overhead, so cap raw bytes at 3.5 MB.
+// Rekognition label detection works fine on downscaled images.
+const SEARCH_IMAGE_MAX_BYTES = 3.5 * 1024 * 1024;
+const SEARCH_IMAGE_MAX_DIM = 1920;
+
+async function resizeAndEncodeImage(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+
+  if (width > SEARCH_IMAGE_MAX_DIM || height > SEARCH_IMAGE_MAX_DIM) {
+    if (width >= height) {
+      height = Math.round((height * SEARCH_IMAGE_MAX_DIM) / width);
+      width = SEARCH_IMAGE_MAX_DIM;
+    } else {
+      width = Math.round((width * SEARCH_IMAGE_MAX_DIM) / height);
+      height = SEARCH_IMAGE_MAX_DIM;
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  for (const quality of [0.85, 0.7, 0.55, 0.4]) {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    const b64 = dataUrl.split(',')[1];
+    if (b64.length * 0.75 <= SEARCH_IMAGE_MAX_BYTES) return b64;
+  }
+  return canvas.toDataURL('image/jpeg', 0.4).split(',')[1];
+}
+
 export async function searchByImage(file: File): Promise<SearchResult[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(arrayBuffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  const imageFile = btoa(binary);
+  const imageFile = await resizeAndEncodeImage(file);
   return request<SearchResult[]>('/search-by-image', {
     method: 'POST',
     body: JSON.stringify({ imageFile }),

@@ -23,7 +23,7 @@ dynamodb = boto3.resource('dynamodb')
 rekognition = boto3.client('rekognition')
 s3 = boto3.client('s3')
 
-MAX_IMAGE_BYTES = 10 * 1024 * 1024  # match upload limit
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Rekognition Image.Bytes limit is 5 MB; Lambda payload cap makes 4 MB the safe ceiling
 
 
 def lambda_handler(event, context):
