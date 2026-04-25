@@ -83,6 +83,23 @@ resource "aws_dynamodb_table" "cloudsnap" {
     type = "S"
   }
 
+  attribute {
+    name = "UserID"
+    type = "S"
+  }
+
+  attribute {
+    name = "UploadedAt"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "UserID-UploadedAt-index"
+    hash_key        = "UserID"
+    range_key       = "UploadedAt"
+    projection_type = "ALL"
+  }
+
   point_in_time_recovery {
     enabled = true
   }

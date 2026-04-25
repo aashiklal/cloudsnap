@@ -17,8 +17,13 @@ variable "environment" {
 }
 
 variable "allowed_origin" {
-  description = "CORS allowed origin — your CloudFront distribution or frontend URL"
+  description = "CORS allowed origin — your CloudFront distribution or frontend URL (used for S3/Lambda)"
   type        = string
+}
+
+variable "allowed_origins" {
+  description = "CORS allowed origins for API Gateway — include your CloudFront URL and http://localhost:3000 for local dev"
+  type        = list(string)
 }
 
 variable "lambda_runtime" {

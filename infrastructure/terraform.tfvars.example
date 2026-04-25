@@ -4,6 +4,7 @@
 aws_region     = "ap-southeast-2"
 project_name   = "cloudsnap"
 environment    = "prod"
-allowed_origin = "https://YOUR_CLOUDFRONT_DOMAIN.cloudfront.net"
+allowed_origin  = "https://YOUR_CLOUDFRONT_DOMAIN.cloudfront.net"
+allowed_origins = ["https://YOUR_CLOUDFRONT_DOMAIN.cloudfront.net", "http://localhost:3000"]
 lambda_runtime = "python3.12"
 alert_email    = "your-email@example.com"

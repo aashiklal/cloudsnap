@@ -22,8 +22,13 @@ locals {
       extra_policy_statements = [
         {
           effect    = "Allow"
-          actions   = ["dynamodb:Scan"]
-          resources = [var.table_arn]
+          actions   = ["dynamodb:Query"]
+          resources = ["${var.table_arn}/index/UserID-UploadedAt-index"]
+        },
+        {
+          effect    = "Allow"
+          actions   = ["s3:GetObject"]
+          resources = ["${var.bucket_arn}/*"]
         }
       ]
     }
@@ -65,7 +70,7 @@ locals {
         },
         {
           effect    = "Allow"
-          actions   = ["dynamodb:PutItem"]
+          actions   = ["dynamodb:UpdateItem"]
           resources = [var.table_arn]
         },
         {
@@ -81,17 +86,17 @@ locals {
       extra_policy_statements = [
         {
           effect    = "Allow"
-          actions   = ["s3:GetObject", "s3:PutObject"]
+          actions   = ["s3:GetObject"]
           resources = ["${var.bucket_arn}/*"]
         },
         {
           effect    = "Allow"
-          actions   = ["dynamodb:Scan"]
-          resources = [var.table_arn]
+          actions   = ["dynamodb:Query"]
+          resources = ["${var.table_arn}/index/UserID-UploadedAt-index"]
         },
         {
           effect    = "Allow"
-          actions   = ["rekognition:DetectLabels", "rekognition:CompareFaces"]
+          actions   = ["rekognition:DetectLabels"]
           resources = ["*"]
         }
       ]
@@ -102,8 +107,13 @@ locals {
       extra_policy_statements = [
         {
           effect    = "Allow"
-          actions   = ["dynamodb:Scan"]
-          resources = [var.table_arn]
+          actions   = ["dynamodb:Query"]
+          resources = ["${var.table_arn}/index/UserID-UploadedAt-index"]
+        },
+        {
+          effect    = "Allow"
+          actions   = ["s3:GetObject"]
+          resources = ["${var.bucket_arn}/*"]
         }
       ]
     }
@@ -209,6 +219,8 @@ resource "aws_lambda_function" "cloudsnap" {
     variables = local.common_env_vars
   }
 
+  publish = contains(["object-detection", "search-by-image"], each.key)
+
   tracing_config {
     mode = "Active"
   }
@@ -221,15 +233,6 @@ resource "aws_lambda_function" "cloudsnap" {
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda]
-}
-
-# Provisioned concurrency for CV-heavy functions to eliminate cold starts
-resource "aws_lambda_provisioned_concurrency_config" "cv_functions" {
-  for_each = toset(["object-detection", "search-by-image"])
-
-  function_name                  = aws_lambda_function.cloudsnap[each.key].function_name
-  qualifier                      = aws_lambda_function.cloudsnap[each.key].version
-  provisioned_concurrent_executions = 2
 }
 
 # Allow object-detection Lambda to send failed events to its DLQ
@@ -254,4 +257,41 @@ resource "aws_lambda_permission" "allow_s3" {
   function_name = aws_lambda_function.cloudsnap["object-detection"].function_name
   principal     = "s3.amazonaws.com"
   source_arn    = var.bucket_arn
+}
+
+# S3 event notification — fires object-detection on every image upload
+resource "aws_s3_bucket_notification" "object_detection" {
+  bucket = var.bucket_name
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.cloudsnap["object-detection"].arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".jpg"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.cloudsnap["object-detection"].arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".jpeg"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.cloudsnap["object-detection"].arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".png"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.cloudsnap["object-detection"].arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".gif"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.cloudsnap["object-detection"].arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".webp"
+  }
+
+  depends_on = [aws_lambda_permission.allow_s3]
 }

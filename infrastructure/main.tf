@@ -51,7 +51,7 @@ module "api" {
   project_name      = var.project_name
   environment       = var.environment
   aws_region        = var.aws_region
-  allowed_origin    = var.allowed_origin
+  allowed_origins   = var.allowed_origins
   cognito_user_pool            = module.auth.user_pool
   cognito_user_pool_client_id  = module.auth.user_pool_client_id
   lambda_functions             = module.compute.lambda_functions
