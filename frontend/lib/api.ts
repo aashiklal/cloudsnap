@@ -1,7 +1,8 @@
-import type { UploadResult, TagInput } from '@/lib/types';
+import type { UploadResult, TagInput, SearchResult } from '@/lib/types';
 import { getAuthToken, clearTokenCache } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE) throw new Error('NEXT_PUBLIC_API_URL is not configured');
 
 async function request<T>(path: string, options: RequestInit): Promise<T> {
   const token = await getAuthToken();
@@ -15,13 +16,22 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
       },
     });
 
-  let res = await makeRequest(token);
+  let res: Response;
+  try {
+    res = await makeRequest(token);
+  } catch {
+    throw new Error('Cannot reach the API — check your network or CORS configuration.');
+  }
 
   // On 401, clear the cache and retry once with a fresh token
   if (res.status === 401) {
     clearTokenCache();
     const freshToken = await getAuthToken();
-    res = await makeRequest(freshToken);
+    try {
+      res = await makeRequest(freshToken);
+    } catch {
+      throw new Error('Cannot reach the API — check your network or CORS configuration.');
+    }
   }
 
   const data = await res.json();
@@ -41,19 +51,19 @@ export async function uploadImage(file: File): Promise<UploadResult> {
   });
 }
 
-export async function searchByTags(tags: TagInput[]): Promise<string[]> {
+export async function searchByTags(tags: TagInput[]): Promise<SearchResult[]> {
   const params = new URLSearchParams();
   tags.forEach((t, i) => {
     params.append(`tag${i + 1}`, t.name);
     params.append(`tag${i + 1}count`, t.count);
   });
-  return request<string[]>(`/search?${params.toString()}`, { method: 'GET' });
+  return request<SearchResult[]>(`/search?${params.toString()}`, { method: 'GET' });
 }
 
-export async function searchByImage(file: File): Promise<string[]> {
+export async function searchByImage(file: File): Promise<SearchResult[]> {
   const form = new FormData();
   form.append('file', file, file.name);
-  return request<string[]>('/search-by-image', {
+  return request<SearchResult[]>('/search-by-image', {
     method: 'POST',
     body: form,
   });

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { searchByImage } from '@/lib/api';
+import type { SearchResult } from '@/lib/types';
 
-type Props = { onResult: (r: string[] | string) => void; setLoading: (v: boolean) => void };
+type Props = { onResult: (r: SearchResult[] | string) => void; setLoading: (v: boolean) => void };
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -13,7 +14,11 @@ export function ReverseSearchTab({ onResult, setLoading }: Props) {
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_SIZE) { setError('File exceeds 10 MB limit'); return; }
+    if (file.size > MAX_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setError(`File is ${sizeMB} MB — maximum allowed size is 10 MB. Please choose a smaller file.`);
+      return;
+    }
     setError('');
     setLoading(true);
     try {

@@ -1,8 +1,8 @@
 import Image from 'next/image';
-import type { SelectedImage } from '@/lib/types';
+import type { SelectedImage, SearchResult } from '@/lib/types';
 
 type Props = {
-  result: string[] | string | null;
+  result: SearchResult[] | string | null;
   isLoading: boolean;
   onSelect?: (image: SelectedImage) => void;
 };
@@ -36,11 +36,12 @@ export function ResultsPanel({ result, isLoading, onSelect }: Props) {
             {onSelect && <span className="ml-1">— click Manage to edit tags or delete</span>}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {result.map((url) => (
+            {result.map((item) => (
               <ImageCard
-                key={url}
-                url={url}
-                onSelect={onSelect ? () => onSelect({ url, tags: [] }) : undefined}
+                key={item.imageUrl}
+                imageUrl={item.imageUrl}
+                presignedUrl={item.presignedUrl}
+                onSelect={onSelect ? () => onSelect({ url: item.imageUrl, presignedUrl: item.presignedUrl, tags: [] }) : undefined}
               />
             ))}
           </div>
@@ -50,22 +51,24 @@ export function ResultsPanel({ result, isLoading, onSelect }: Props) {
   );
 }
 
-function ImageCard({ url, onSelect }: { url: string; onSelect?: () => void }) {
+function ImageCard({ imageUrl, presignedUrl, onSelect }: { imageUrl: string; presignedUrl: string; onSelect?: () => void }) {
+  const filename = imageUrl.split('/').pop() ?? imageUrl;
   return (
     <div className="group rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors">
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+      <a href={presignedUrl} target="_blank" rel="noopener noreferrer" className="block">
         <div className="relative aspect-square bg-gray-100">
           <Image
-            src={url}
+            src={presignedUrl}
             alt="Search result"
             fill
+            unoptimized
             className="object-cover group-hover:opacity-90 transition-opacity"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
           />
         </div>
       </a>
       <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs text-gray-400 truncate flex-1">{url.split('/').pop()}</p>
+        <p className="text-xs text-gray-400 truncate flex-1">{filename}</p>
         {onSelect && (
           <button
             onClick={onSelect}

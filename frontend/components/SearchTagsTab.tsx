@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { searchByTags } from '@/lib/api';
-import type { TagInput } from '@/lib/types';
+import type { TagInput, SearchResult } from '@/lib/types';
 
-type Props = { onResult: (r: string[] | string) => void; setLoading: (v: boolean) => void };
+type Props = { onResult: (r: SearchResult[] | string) => void; setLoading: (v: boolean) => void };
 
 export function SearchTagsTab({ onResult, setLoading }: Props) {
   const [tags, setTags] = useState<TagInput[]>([{ name: '', count: '1' }]);

@@ -6,7 +6,7 @@ import { deleteImage } from '@/lib/api';
 import type { SelectedImage } from '@/lib/types';
 
 type Props = {
-  onResult: (r: string[] | string) => void;
+  onResult: (r: string) => void;
   setLoading: (v: boolean) => void;
   selectedImage?: SelectedImage;
   onClearSelection?: () => void;
@@ -40,7 +40,7 @@ export function DeleteTab({ onResult, setLoading, selectedImage, onClearSelectio
       {selectedImage ? (
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
           <div className="relative h-16 w-16 flex-shrink-0 rounded overflow-hidden bg-gray-200">
-            <Image src={selectedImage.url} alt="Selected" fill className="object-cover" sizes="64px" />
+            <Image src={selectedImage.presignedUrl ?? selectedImage.url} alt="Selected" fill unoptimized className="object-cover" sizes="64px" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-700 truncate">
