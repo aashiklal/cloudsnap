@@ -1,10 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { X, Plus, Search } from 'lucide-react';
 import { searchByTags } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import type { TagInput, SearchResult } from '@/lib/types';
 
 type Props = { onResult: (r: SearchResult[] | string) => void; setLoading: (v: boolean) => void };
+
+const inputClass = 'px-3 py-2 border border-white/[0.09] rounded-lg text-sm bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors';
 
 export function SearchTagsTab({ onResult, setLoading }: Props) {
   const [tags, setTags] = useState<TagInput[]>([{ name: '', count: '1' }]);
@@ -40,6 +44,11 @@ export function SearchTagsTab({ onResult, setLoading }: Props) {
 
   return (
     <form onSubmit={handleSearch} className="space-y-4 max-w-lg">
+      <div>
+        <p className="text-sm font-medium text-foreground">Search by tags</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Find images that contain all specified tags</p>
+      </div>
+
       <div className="space-y-2">
         {tags.map((tag, i) => (
           <div key={i} className="flex gap-2 items-center">
@@ -48,7 +57,7 @@ export function SearchTagsTab({ onResult, setLoading }: Props) {
               placeholder="Tag name (e.g. dog)"
               value={tag.name}
               onChange={(e) => updateTag(i, 'name', e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`flex-1 ${inputClass}`}
             />
             <input
               type="number"
@@ -56,15 +65,15 @@ export function SearchTagsTab({ onResult, setLoading }: Props) {
               min="1"
               value={tag.count}
               onChange={(e) => updateTag(i, 'count', e.target.value)}
-              className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-28 ${inputClass}`}
             />
             {tags.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeTag(i)}
-                className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
-                ×
+                <X className="size-3.5" />
               </button>
             )}
           </div>
@@ -74,19 +83,16 @@ export function SearchTagsTab({ onResult, setLoading }: Props) {
       <button
         type="button"
         onClick={addTag}
-        className="text-sm text-blue-600 hover:underline"
+        className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
       >
-        + Add tag
+        <Plus className="size-4" /> Add tag
       </button>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <button
-        type="submit"
-        className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-      >
-        Search
-      </button>
+      <Button type="submit" className="w-full sm:w-auto">
+        <Search className="size-3.5 mr-1.5" /> Search
+      </Button>
     </form>
   );
 }

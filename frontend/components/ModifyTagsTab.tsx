@@ -3,8 +3,14 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
+import { motion } from 'framer-motion';
+import { AlertCircle, RefreshCw, ImageOff, ArrowLeft, Tag, Plus, Minus, X } from 'lucide-react';
 import { listImages, modifyTags } from '@/lib/api';
-import type { Tag, SelectedImage } from '@/lib/types';
+import { SkeletonGrid } from '@/components/ui/SkeletonCard';
+import { TagBadge } from '@/components/ui/TagBadge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import type { Tag as TagType, SelectedImage } from '@/lib/types';
 
 type Props = {
   onResult: (r: string) => void;
@@ -82,49 +88,60 @@ export function ModifyTagsTab({ onResult, setLoading, preselected, onClearPresel
   }
 
   const filename = active.url.split('/').pop() ?? active.url;
-  const currentTags: Tag[] = active.tags;
+  const currentTags: TagType[] = active.tags;
+
+  const inputClass = 'flex-1 px-3 py-2 border border-white/[0.09] rounded-lg text-sm bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
-      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="relative h-16 w-16 flex-shrink-0 rounded overflow-hidden bg-gray-200">
+      {/* Selected image bar */}
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-white/[0.08] bg-white/[0.03]">
+        <div className="relative h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden bg-white/5 ring-2 ring-primary/25">
           <Image
             src={active.presignedUrl ?? active.url}
             alt={filename}
             fill
             unoptimized
             className="object-cover"
-            sizes="64px"
+            sizes="56px"
           />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-700 truncate">{filename}</p>
-          <p className="text-xs text-gray-400">{currentTags.length} tag{currentTags.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{filename}</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Tag className="size-3 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">
+              {currentTags.length} tag{currentTags.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
         <button
           type="button"
           onClick={clearSelection}
-          className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-white/5 flex-shrink-0"
         >
-          Change
+          <ArrowLeft className="size-3" /> Change
         </button>
       </div>
 
-      <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
-        <button
-          type="button"
-          onClick={() => setAction('add')}
-          className={`flex-1 py-2 transition-colors ${action === 'add' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-        >
-          Add tags
-        </button>
-        <button
-          type="button"
-          onClick={() => setAction('remove')}
-          className={`flex-1 py-2 transition-colors ${action === 'remove' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-        >
-          Remove tags
-        </button>
+      {/* Add / Remove toggle */}
+      <div className="flex rounded-xl border border-white/[0.08] overflow-hidden bg-white/[0.02]">
+        {(['add', 'remove'] as const).map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => setAction(a)}
+            className={cn(
+              'flex-1 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-1.5',
+              action === a
+                ? 'brand-gradient text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-white/5'
+            )}
+          >
+            {a === 'add' ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
+            {a === 'add' ? 'Add Tags' : 'Remove Tags'}
+          </button>
+        ))}
       </div>
 
       {action === 'add' && (
@@ -136,15 +153,15 @@ export function ModifyTagsTab({ onResult, setLoading, preselected, onClearPresel
                 placeholder="Tag name (e.g. dog, car, person)"
                 value={tag}
                 onChange={(e) => setNewTags((p) => p.map((v, idx) => idx === i ? e.target.value : v))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputClass}
               />
               {newTags.length > 1 && (
                 <button
                   type="button"
                   onClick={() => setNewTags((p) => p.filter((_, idx) => idx !== i))}
-                  className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
-                  ×
+                  <X className="size-3.5" />
                 </button>
               )}
             </div>
@@ -152,9 +169,9 @@ export function ModifyTagsTab({ onResult, setLoading, preselected, onClearPresel
           <button
             type="button"
             onClick={() => setNewTags((p) => [...p, ''])}
-            className="text-sm text-blue-600 hover:underline"
+            className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
           >
-            + Add another tag
+            <Plus className="size-4" /> Add another tag
           </button>
         </div>
       )}
@@ -164,34 +181,29 @@ export function ModifyTagsTab({ onResult, setLoading, preselected, onClearPresel
           {currentTags.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {currentTags.map((t) => (
-                <button
+                <TagBadge
                   key={t.tag}
-                  type="button"
+                  label={t.tag}
+                  variant={tagsToRemove.has(t.tag) ? 'removable' : 'selected'}
                   onClick={() => toggleRemove(t.tag)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    tagsToRemove.has(t.tag)
-                      ? 'bg-red-100 border-red-300 text-red-700 line-through'
-                      : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
-                  }`}
-                >
-                  {t.tag}
-                </button>
+                />
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">This image has no tags to remove.</p>
+            <p className="text-sm text-muted-foreground">This image has no tags to remove.</p>
           )}
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-destructive">
+          {error}
+        </motion.p>
+      )}
 
-      <button
-        type="submit"
-        className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-      >
+      <Button type="submit" className="w-full sm:w-auto">
         {action === 'add' ? 'Add tags' : 'Remove selected tags'}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -204,43 +216,55 @@ function ImagePicker({ onSelect }: { onSelect: (img: SelectedImage) => void }) {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        Loading your images…
-      </div>
-    );
+    return <SkeletonGrid count={6} />;
   }
 
   if (error) {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-red-600">Failed to load images</p>
-        <button onClick={() => mutate()} className="text-sm text-blue-600 hover:underline">Try again</button>
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <AlertCircle className="size-8 text-destructive/60" />
+        <p className="text-sm text-destructive">Failed to load images</p>
+        <button
+          onClick={() => mutate()}
+          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+        >
+          <RefreshCw className="size-3.5" /> Try again
+        </button>
       </div>
     );
   }
 
   if (!images || images.length === 0) {
     return (
-      <p className="text-sm text-gray-400 py-8 text-center">No images yet. Upload one to get started.</p>
+      <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 border border-white/[0.07]">
+          <ImageOff className="size-8 text-muted-foreground/50" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">No images yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Upload your first image to get started</p>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-600 font-medium">Select an image to edit its tags</p>
+      <p className="text-sm font-medium text-foreground">Select an image to edit its tags</p>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {images.map((img) => {
           const filename = img.ImageURL.split('/').pop() ?? img.ImageURL;
           return (
-            <button
+            <motion.button
               key={img.ImageURL}
               type="button"
+              whileHover={{ scale: 1.03 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               onClick={() => onSelect({ url: img.ImageURL, presignedUrl: img.PresignedURL ?? undefined, tags: img.Tags })}
-              className="group relative rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors focus:outline-none focus:border-blue-500"
+              className="group relative rounded-lg overflow-hidden border-2 border-transparent hover:border-primary/50 transition-colors focus:outline-none focus:border-primary"
+              style={{ background: 'oklch(0.12 0.015 264)' }}
             >
-              <div className="relative aspect-square bg-gray-100">
+              <div className="relative aspect-square bg-white/5">
                 <Image
                   src={img.PresignedURL ?? img.ImageURL}
                   alt={filename}
@@ -251,9 +275,9 @@ function ImagePicker({ onSelect }: { onSelect: (img: SelectedImage) => void }) {
                 />
               </div>
               <div className="p-1">
-                <p className="text-xs text-gray-500 truncate">{filename}</p>
+                <p className="text-xs text-muted-foreground truncate">{filename}</p>
               </div>
-            </button>
+            </motion.button>
           );
         })}
       </div>

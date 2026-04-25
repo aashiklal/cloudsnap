@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Outfit } from 'next/font/google';
 import './globals.css';
 import { AmplifyProvider } from '@/components/AmplifyProvider';
 
-const inter = Inter({ subsets: ['latin'] });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'CloudSnap',
@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full bg-gray-50 antialiased`}>
+    <html lang="en" className={`${outfit.variable} dark h-full`}>
+      <body className="font-sans h-full antialiased">
         <AmplifyProvider>{children}</AmplifyProvider>
       </body>
     </html>

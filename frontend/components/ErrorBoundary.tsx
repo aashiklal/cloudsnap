@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, type ReactNode } from 'react';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -27,16 +28,21 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback ?? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center space-y-3">
-          <p className="text-sm font-medium text-red-800">Something went wrong</p>
-          {this.state.message && (
-            <p className="text-xs text-red-600">{this.state.message}</p>
-          )}
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center space-y-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 mx-auto">
+            <AlertTriangle className="size-7 text-destructive" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Something went wrong</p>
+            {this.state.message && (
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">{this.state.message}</p>
+            )}
+          </div>
           <button
             onClick={this.reset}
-            className="text-sm text-red-700 underline hover:text-red-900"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:underline mx-auto"
           >
-            Try again
+            <RefreshCcw className="size-3.5" /> Try again
           </button>
         </div>
       );

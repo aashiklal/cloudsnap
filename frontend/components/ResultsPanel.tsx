@@ -1,4 +1,8 @@
+'use client';
+
 import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { Loader2, SearchX, ExternalLink, Settings2 } from 'lucide-react';
 import type { SelectedImage, SearchResult } from '@/lib/types';
 
 type Props = {
@@ -7,45 +11,69 @@ type Props = {
   onSelect?: (image: SelectedImage) => void;
 };
 
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, scale: 0.92, y: 8 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.2 } },
+};
+
 export function ResultsPanel({ result, isLoading, onSelect }: Props) {
   if (!isLoading && result === null) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 className="text-sm font-medium text-gray-700 mb-4">Results</h3>
+    <div className="bg-card rounded-xl border border-white/[0.08] p-6"
+      style={{ boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.05), 0 1px 3px oklch(0 0 0 / 0.3)' }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold">
+          <span className="brand-gradient-text">Results</span>
+        </h3>
+        {Array.isArray(result) && result.length > 0 && (
+          <span className="text-xs bg-primary/15 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium">
+            {result.length} found
+          </span>
+        )}
+      </div>
 
       {isLoading && (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          Processing…
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          Processing your request…
         </div>
       )}
 
       {!isLoading && typeof result === 'string' && (
-        <p className="text-sm text-gray-700">{result}</p>
+        <p className="text-sm text-foreground">{result}</p>
       )}
 
       {!isLoading && Array.isArray(result) && result.length === 0 && (
-        <p className="text-sm text-gray-500">No matching images found.</p>
+        <div className="flex flex-col items-center gap-3 py-12 text-center">
+          <SearchX className="size-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">No matching images found</p>
+        </div>
       )}
 
       {!isLoading && Array.isArray(result) && result.length > 0 && (
-        <div>
-          <p className="text-xs text-gray-500 mb-3">
-            {result.length} image{result.length !== 1 ? 's' : ''} found
-            {onSelect && <span className="ml-1">— click Manage to edit tags or delete</span>}
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {result.map((item) => (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+        >
+          {result.map((item) => (
+            <motion.div key={item.imageUrl} variants={itemVariants}>
               <ImageCard
-                key={item.imageUrl}
                 imageUrl={item.imageUrl}
                 presignedUrl={item.presignedUrl}
                 onSelect={onSelect ? () => onSelect({ url: item.imageUrl, presignedUrl: item.presignedUrl, tags: [] }) : undefined}
               />
-            ))}
-          </div>
-        </div>
+            </motion.div>
+          ))}
+        </motion.div>
       )}
     </div>
   );
@@ -54,9 +82,14 @@ export function ResultsPanel({ result, isLoading, onSelect }: Props) {
 function ImageCard({ imageUrl, presignedUrl, onSelect }: { imageUrl: string; presignedUrl: string; onSelect?: () => void }) {
   const filename = imageUrl.split('/').pop() ?? imageUrl;
   return (
-    <div className="group rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors">
-      <a href={presignedUrl} target="_blank" rel="noopener noreferrer" className="block">
-        <div className="relative aspect-square bg-gray-100">
+    <div
+      className="group rounded-xl overflow-hidden border border-white/[0.08] bg-card transition-all duration-200 hover:border-primary/30"
+      style={{ ['--hover-shadow' as string]: '0 0 16px var(--primary-glow)' }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 16px var(--primary-glow)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
+    >
+      <a href={presignedUrl} target="_blank" rel="noopener noreferrer" className="block relative">
+        <div className="relative aspect-square bg-white/5">
           <Image
             src={presignedUrl}
             alt="Search result"
@@ -65,16 +98,24 @@ function ImageCard({ imageUrl, presignedUrl, onSelect }: { imageUrl: string; pre
             className="object-cover group-hover:opacity-90 transition-opacity"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
           />
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%)' }}
+          />
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="rounded-md p-1" style={{ background: 'oklch(0 0 0 / 0.5)', backdropFilter: 'blur(4px)' }}>
+              <ExternalLink className="size-3 text-white" />
+            </div>
+          </div>
         </div>
       </a>
-      <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs text-gray-400 truncate flex-1">{filename}</p>
+      <div className="flex items-center justify-between px-2.5 py-2">
+        <p className="text-xs text-muted-foreground truncate flex-1">{filename}</p>
         {onSelect && (
           <button
             onClick={onSelect}
-            className="text-xs text-blue-600 hover:underline ml-2 flex-shrink-0"
+            className="flex items-center gap-1 text-xs text-primary hover:underline ml-2 flex-shrink-0"
           >
-            Manage
+            <Settings2 className="size-3" /> Manage
           </button>
         )}
       </div>

@@ -1,24 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ScanSearch } from 'lucide-react';
 import { searchByImage } from '@/lib/api';
+import { DragDropZone } from '@/components/ui/DragDropZone';
 import type { SearchResult } from '@/lib/types';
 
 type Props = { onResult: (r: SearchResult[] | string) => void; setLoading: (v: boolean) => void };
 
-const MAX_SIZE = 10 * 1024 * 1024;
-
 export function ReverseSearchTab({ onResult, setLoading }: Props) {
   const [error, setError] = useState('');
 
-  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_SIZE) {
-      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      setError(`File is ${sizeMB} MB — maximum allowed size is 10 MB. Please choose a smaller file.`);
-      return;
-    }
+  async function handleFile(file: File) {
     setError('');
     setLoading(true);
     try {
@@ -32,21 +26,34 @@ export function ReverseSearchTab({ onResult, setLoading }: Props) {
   }
 
   return (
-    <div className="space-y-4 max-w-md">
-      <p className="text-sm text-gray-600">
-        Upload an image to find visually similar images in your library based on detected objects.
-      </p>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Query image</label>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          onChange={handleChange}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        <p className="text-xs text-gray-400 mt-1">Select an image to search automatically</p>
+    <div className="space-y-4 max-w-lg">
+      <div
+        className="flex items-start gap-3 p-4 rounded-xl border border-primary/15"
+        style={{ background: 'oklch(0.62 0.19 215 / 0.06)' }}
+      >
+        <ScanSearch className="size-5 text-primary flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-foreground">Visual Similarity Search</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Upload a query image to find visually similar images in your library using AWS Rekognition object detection.
+          </p>
+        </div>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <DragDropZone
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        maxSizeMB={10}
+        onFile={handleFile}
+        onError={setError}
+        label="Drop a query image"
+        hint="Search starts automatically on selection"
+      />
+
+      {error && (
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-destructive">
+          {error}
+        </motion.p>
+      )}
     </div>
   );
 }
