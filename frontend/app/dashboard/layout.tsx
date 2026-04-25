@@ -1,12 +1,20 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { SignOutButton } from './SignOutButton';
 
-export const metadata = {
-  title: 'Dashboard — CloudSnap',
-  description: 'Manage your images with AI-powered tagging and search',
-};
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    fetchAuthSession()
+      .then((s) => { if (!s.tokens) router.replace('/login'); })
+      .catch(() => router.replace('/login'));
+  }, [router]);
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">

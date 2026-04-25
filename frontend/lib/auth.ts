@@ -23,8 +23,13 @@ export async function getAuthToken(): Promise<string> {
   if (!idToken) throw new Error('No auth token — please sign in');
 
   const token = idToken.toString();
-  // JWT payload is the second segment; exp is in seconds
-  const payload = JSON.parse(atob(token.split('.')[1]));
+  let payload: { exp: number };
+  try {
+    payload = JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    tokenCache = null;
+    throw new Error('Auth session is corrupted — please sign in again');
+  }
   const expiresAt = (payload.exp as number) * 1000;
 
   tokenCache = { value: token, expiresAt };

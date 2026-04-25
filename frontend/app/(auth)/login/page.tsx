@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'aws-amplify/auth';
+import { useEffect, useState } from 'react';
+import { fetchAuthSession, signIn } from 'aws-amplify/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -12,6 +12,19 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    fetchAuthSession()
+      .then((s) => { if (s.tokens) router.replace('/dashboard'); })
+      .catch(() => {});
+  }, [router]);
+
+  const ERROR_MESSAGES: Record<string, string> = {
+    NotAuthorizedException: 'Incorrect email or password.',
+    UserNotFoundException: 'No account found with that email.',
+    UserNotConfirmedException: 'Please confirm your email first.',
+    UserAlreadyAuthenticatedException: 'Already signed in.',
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -20,7 +33,12 @@ export default function LoginPage() {
       await signIn({ username: email, password });
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign in failed');
+      const name = (err as { name?: string }).name ?? '';
+      if (name === 'UserAlreadyAuthenticatedException') {
+        router.replace('/dashboard');
+        return;
+      }
+      setError(ERROR_MESSAGES[name] ?? (err instanceof Error ? err.message : 'Sign in failed'));
     } finally {
       setLoading(false);
     }
