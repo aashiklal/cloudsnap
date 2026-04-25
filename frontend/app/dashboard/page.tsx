@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { TabId, SelectedImage } from '@/lib/types';
+import type { TabId, SelectedImage, SearchResult } from '@/lib/types';
 import { UploadTab } from '@/components/UploadTab';
 import { GalleryTab } from '@/components/GalleryTab';
 import { SearchTagsTab } from '@/components/SearchTagsTab';
 import { ReverseSearchTab } from '@/components/ReverseSearchTab';
 import { ModifyTagsTab } from '@/components/ModifyTagsTab';
-import { DeleteTab } from '@/components/DeleteTab';
 import { ResultsPanel } from '@/components/ResultsPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -17,12 +16,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'search', label: 'Search by Tags' },
   { id: 'reverse', label: 'Search by Image' },
   { id: 'modify', label: 'Edit Tags' },
-  { id: 'delete', label: 'Delete' },
 ];
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabId>('upload');
-  const [result, setResult] = useState<string[] | string | null>(null);
+  const [result, setResult] = useState<SearchResult[] | string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
 
@@ -64,7 +62,7 @@ export default function DashboardPage() {
           )}
           {activeTab === 'gallery' && (
             <GalleryTab
-              onManage={(img, action) => navigate(action === 'modify' ? 'modify' : 'delete', img)}
+              onEditTags={(img) => navigate('modify', img)}
             />
           )}
           {activeTab === 'search' && (
@@ -77,16 +75,8 @@ export default function DashboardPage() {
             <ModifyTagsTab
               onResult={setResult}
               setLoading={setIsLoading}
-              selectedImage={selectedImage ?? undefined}
-              onClearSelection={() => setSelectedImage(null)}
-            />
-          )}
-          {activeTab === 'delete' && (
-            <DeleteTab
-              onResult={setResult}
-              setLoading={setIsLoading}
-              selectedImage={selectedImage ?? undefined}
-              onClearSelection={() => setSelectedImage(null)}
+              preselected={selectedImage ?? undefined}
+              onClearPreselected={() => setSelectedImage(null)}
             />
           )}
         </div>
