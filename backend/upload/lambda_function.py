@@ -1,7 +1,10 @@
 import json
 import os
+import re
+import uuid
 import base64
 import logging
+from datetime import datetime, timezone
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 import boto3
 
@@ -9,9 +12,10 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 BUCKET_NAME = os.environ['BUCKET_NAME']
+TABLE_NAME = os.environ['TABLE_NAME']
 ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', '*')
 MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
-ALLOWED_MIME_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+ALLOWED_MIME_TYPES = {'image/jpeg', 'image/png'}
 
 CORS_HEADERS = {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
@@ -25,12 +29,14 @@ def lambda_handler(event, context):
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
 
     try:
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        user_id = claims.get('sub', 'unknown')
+
         content_type = (event.get('headers') or {}).get('content-type', '')
 
         if 'multipart/form-data' in content_type:
             image_bytes, filename = _parse_multipart(event, content_type)
         else:
-            # Fallback: JSON body with base64-encoded image
             data = json.loads(event['body'])
             image_b64 = data.get('image')
             filename = data.get('filename')
@@ -48,22 +54,35 @@ def lambda_handler(event, context):
         if mime_type not in ALLOWED_MIME_TYPES:
             return _error(400, f'Invalid file type. Allowed types: {", ".join(ALLOWED_MIME_TYPES)}')
 
+        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', os.path.basename(filename))
+        s3_key = f"{user_id}/{uuid.uuid4().hex}_{safe_name}"
+
         s3 = boto3.client('s3')
         s3.put_object(
             Body=image_bytes,
             Bucket=BUCKET_NAME,
-            Key=filename,
+            Key=s3_key,
             ContentType=mime_type,
         )
 
-        logger.info({'action': 'upload', 'filename': filename, 'size_bytes': len(image_bytes)})
+        image_url = f'https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}'
+
+        table = boto3.resource('dynamodb').Table(TABLE_NAME)
+        table.put_item(Item={
+            'ImageURL': image_url,
+            'UserID': user_id,
+            'UploadedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f'),
+            'Tags': [],
+        })
+
+        logger.info({'action': 'upload', 'key': s3_key, 'size_bytes': len(image_bytes), 'user_id': user_id})
 
         return {
             'statusCode': 200,
             'headers': CORS_HEADERS,
             'body': json.dumps({
                 'message': 'Image uploaded successfully',
-                'url': f'https://{BUCKET_NAME}.s3.amazonaws.com/{filename}',
+                'url': image_url,
             }),
         }
 
@@ -121,10 +140,6 @@ def _detect_mime_type(data: bytes) -> str:
         return 'image/jpeg'
     if data[:8] == b'\x89PNG\r\n\x1a\n':
         return 'image/png'
-    if data[:6] in (b'GIF87a', b'GIF89a'):
-        return 'image/gif'
-    if data[:4] == b'RIFF' or data[8:12] == b'WEBP':
-        return 'image/webp'
     return 'application/octet-stream'
 
 
