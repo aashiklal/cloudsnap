@@ -64,3 +64,6 @@ secrets.json
 # Test coverage
 .coverage
 htmlcov/
+
+AGENTS.md
+CONTEXT.md

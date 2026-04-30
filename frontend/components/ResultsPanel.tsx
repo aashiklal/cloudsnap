@@ -2,8 +2,8 @@
 
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Loader2, SearchX, ExternalLink, Settings2 } from 'lucide-react';
-import type { SelectedImage, SearchResult } from '@/lib/types';
+import { Loader2, SearchX, ExternalLink, Settings2, CheckCircle2 } from 'lucide-react';
+import type { ProcessingStatus, SelectedImage, SearchResult } from '@/lib/types';
 
 type Props = {
   result: SearchResult[] | string | null;
@@ -69,7 +69,13 @@ export function ResultsPanel({ result, isLoading, onSelect }: Props) {
               <ImageCard
                 imageUrl={item.imageUrl}
                 presignedUrl={item.presignedUrl}
-                onSelect={onSelect ? () => onSelect({ url: item.imageUrl, presignedUrl: item.presignedUrl, tags: [] }) : undefined}
+                processingStatus={item.processingStatus ?? 'ready'}
+                onSelect={onSelect ? () => onSelect({
+                  url: item.imageUrl,
+                  presignedUrl: item.presignedUrl,
+                  tags: [],
+                  processingStatus: item.processingStatus ?? 'ready',
+                }) : undefined}
               />
             </motion.div>
           ))}
@@ -79,7 +85,17 @@ export function ResultsPanel({ result, isLoading, onSelect }: Props) {
   );
 }
 
-function ImageCard({ imageUrl, presignedUrl, onSelect }: { imageUrl: string; presignedUrl: string; onSelect?: () => void }) {
+function ImageCard({
+  imageUrl,
+  presignedUrl,
+  processingStatus,
+  onSelect,
+}: {
+  imageUrl: string;
+  presignedUrl: string;
+  processingStatus: ProcessingStatus;
+  onSelect?: () => void;
+}) {
   const filename = imageUrl.split('/').pop() ?? imageUrl;
   return (
     <div
@@ -105,6 +121,12 @@ function ImageCard({ imageUrl, presignedUrl, onSelect }: { imageUrl: string; pre
             <div className="rounded-md p-1" style={{ background: 'oklch(0 0 0 / 0.5)', backdropFilter: 'blur(4px)' }}>
               <ExternalLink className="size-3 text-white" />
             </div>
+          </div>
+          <div className="absolute left-2 top-2">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/16 px-2 py-0.5 text-[11px] font-medium text-emerald-300 backdrop-blur-sm">
+              <CheckCircle2 className="size-3" />
+              {processingStatus === 'ready' ? 'Ready' : processingStatus}
+            </span>
           </div>
         </div>
       </a>

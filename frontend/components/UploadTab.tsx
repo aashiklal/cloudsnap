@@ -43,7 +43,7 @@ export function UploadTab({ onResult, setLoading }: Props) {
     setError('');
     try {
       const result = await uploadImage(file);
-      onResult(result.url);
+      onResult(result.message);
       mutate('images');
       clearFile();
     } catch (err: unknown) {

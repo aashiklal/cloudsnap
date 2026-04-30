@@ -4,11 +4,11 @@ import { useState } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
-import { AlertCircle, RefreshCw, ImageOff, Images, Pencil, Trash2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, ImageOff, Images, Pencil, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { listImages, deleteImage } from '@/lib/api';
 import { SkeletonGrid } from '@/components/ui/SkeletonCard';
 import { TagBadge } from '@/components/ui/TagBadge';
-import type { ImageRecord, SelectedImage } from '@/lib/types';
+import type { ImageRecord, ProcessingStatus, SelectedImage } from '@/lib/types';
 
 type Props = {
   onEditTags: (image: SelectedImage) => void;
@@ -78,7 +78,12 @@ export function GalleryTab({ onEditTags }: Props) {
           <GalleryCard
             key={img.ImageURL}
             image={img}
-            onEditTags={() => onEditTags({ url: img.ImageURL, presignedUrl: img.PresignedURL ?? undefined, tags: img.Tags })}
+            onEditTags={() => onEditTags({
+              url: img.ImageURL,
+              presignedUrl: img.PresignedURL ?? undefined,
+              tags: img.Tags,
+              processingStatus: img.ProcessingStatus,
+            })}
             onDeleted={() => mutate()}
           />
         ))}
@@ -101,6 +106,7 @@ function GalleryCard({
   const [deleteError, setDeleteError] = useState('');
 
   const filename = image.ImageURL.split('/').pop() ?? image.ImageURL;
+  const status = image.ProcessingStatus ?? 'ready';
 
   async function handleDelete() {
     setDeleting(true);
@@ -138,6 +144,9 @@ function GalleryCard({
           className="object-cover"
           sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
         />
+        <div className="absolute left-2 top-2">
+          <ProcessingStatusBadge status={status} />
+        </div>
         {!confirming && (
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center gap-2 p-3"
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)' }}
@@ -185,8 +194,12 @@ function GalleryCard({
       ) : (
         <div className="p-2">
           <p className="text-xs text-foreground truncate font-medium">{filename}</p>
-          {image.Tags.length === 0 ? (
-            <span className="text-xs text-amber-400/80 italic">Analyzing…</span>
+          {status === 'processing' ? (
+            <span className="text-xs text-amber-400/80">Analysis in progress</span>
+          ) : status === 'failed' ? (
+            <span className="text-xs text-destructive">Analysis failed</span>
+          ) : image.Tags.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No tags detected</span>
           ) : (
             <div className="flex flex-wrap gap-1 mt-1">
               {image.Tags.slice(0, 3).map((t) => (
@@ -200,5 +213,36 @@ function GalleryCard({
         </div>
       )}
     </motion.div>
+  );
+}
+
+function ProcessingStatusBadge({ status }: { status: ProcessingStatus }) {
+  const config = {
+    processing: {
+      label: 'Processing',
+      icon: Loader2,
+      className: 'bg-amber-500/16 text-amber-300 border-amber-400/25',
+      iconClassName: 'animate-spin',
+    },
+    ready: {
+      label: 'Ready',
+      icon: CheckCircle2,
+      className: 'bg-emerald-500/16 text-emerald-300 border-emerald-400/25',
+      iconClassName: '',
+    },
+    failed: {
+      label: 'Failed',
+      icon: XCircle,
+      className: 'bg-destructive/18 text-destructive border-destructive/25',
+      iconClassName: '',
+    },
+  }[status];
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm ${config.className}`}>
+      <Icon className={`size-3 ${config.iconClassName}`} />
+      {config.label}
+    </span>
   );
 }

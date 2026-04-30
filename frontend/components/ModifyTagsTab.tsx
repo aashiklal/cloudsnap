@@ -111,7 +111,9 @@ export function ModifyTagsTab({ onResult, setLoading, preselected, onClearPresel
           <div className="flex items-center gap-1 mt-0.5">
             <Tag className="size-3 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">
-              {currentTags.length} tag{currentTags.length !== 1 ? 's' : ''}
+              {(active.processingStatus ?? 'ready') === 'ready'
+                ? `${currentTags.length} tag${currentTags.length !== 1 ? 's' : ''}`
+                : `Analysis ${active.processingStatus ?? 'ready'}`}
             </p>
           </div>
         </div>
@@ -260,7 +262,12 @@ function ImagePicker({ onSelect }: { onSelect: (img: SelectedImage) => void }) {
               type="button"
               whileHover={{ scale: 1.03 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              onClick={() => onSelect({ url: img.ImageURL, presignedUrl: img.PresignedURL ?? undefined, tags: img.Tags })}
+              onClick={() => onSelect({
+                url: img.ImageURL,
+                presignedUrl: img.PresignedURL ?? undefined,
+                tags: img.Tags,
+                processingStatus: img.ProcessingStatus,
+              })}
               className="group relative rounded-lg overflow-hidden border-2 border-transparent hover:border-primary/50 transition-colors focus:outline-none focus:border-primary"
               style={{ background: 'oklch(0.12 0.015 264)' }}
             >
