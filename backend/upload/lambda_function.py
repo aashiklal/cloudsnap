@@ -4,33 +4,47 @@ import re
 import uuid
 import base64
 import logging
-from datetime import datetime, timezone
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 import boto3
+
+try:
+    from backend.http_api import (
+        cors_headers,
+        error_response,
+        is_preflight_request,
+        json_response,
+        preflight_response,
+        user_id_from_event,
+    )
+    from backend.image_records import image_url_for_s3_object, put_processing_image_record
+except ModuleNotFoundError:
+    from http_api import (
+        cors_headers,
+        error_response,
+        is_preflight_request,
+        json_response,
+        preflight_response,
+        user_id_from_event,
+    )
+    from image_records import image_url_for_s3_object, put_processing_image_record
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 BUCKET_NAME = os.environ['BUCKET_NAME']
 TABLE_NAME = os.environ['TABLE_NAME']
-ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', '*')
 MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_MIME_TYPES = {'image/jpeg', 'image/png'}
 
-CORS_HEADERS = {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST',
-}
+CORS_HEADERS = cors_headers('OPTIONS,POST')
 
 
 def lambda_handler(event, context):
-    if event.get('httpMethod') == 'OPTIONS' or event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS':
-        return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
+    if is_preflight_request(event):
+        return preflight_response(CORS_HEADERS)
 
     try:
-        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
-        user_id = claims.get('sub', 'unknown')
+        user_id = user_id_from_event(event)
 
         content_type = (event.get('headers') or {}).get('content-type', '')
 
@@ -65,26 +79,22 @@ def lambda_handler(event, context):
             ContentType=mime_type,
         )
 
-        image_url = f'https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}'
+        image_url = image_url_for_s3_object(BUCKET_NAME, s3_key)
 
         table = boto3.resource('dynamodb').Table(TABLE_NAME)
-        table.put_item(Item={
-            'ImageURL': image_url,
-            'UserID': user_id,
-            'UploadedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f'),
-            'Tags': [],
-        })
+        put_processing_image_record(table, image_url, user_id)
 
         logger.info({'action': 'upload', 'key': s3_key, 'size_bytes': len(image_bytes), 'user_id': user_id})
 
-        return {
-            'statusCode': 200,
-            'headers': CORS_HEADERS,
-            'body': json.dumps({
-                'message': 'Image uploaded successfully',
+        return json_response(
+            200,
+            {
+                'message': 'Image uploaded successfully; analysis is processing',
                 'url': image_url,
-            }),
-        }
+                'processingStatus': 'processing',
+            },
+            CORS_HEADERS,
+        )
 
     except (NoCredentialsError, PartialCredentialsError):
         logger.error('AWS credentials error')
@@ -144,8 +154,4 @@ def _detect_mime_type(data: bytes) -> str:
 
 
 def _error(status: int, message: str) -> dict:
-    return {
-        'statusCode': status,
-        'headers': CORS_HEADERS,
-        'body': json.dumps({'error': message}),
-    }
+    return error_response(status, message, CORS_HEADERS)

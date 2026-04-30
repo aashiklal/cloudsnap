@@ -120,3 +120,26 @@ def test_search_by_image_missing_image_field(aws_resources):
     resp = handler({'body': json.dumps({}), 'isBase64Encoded': False}, {})
     assert resp['statusCode'] == 400
     assert 'Missing image' in json.loads(resp['body'])['error']
+
+
+def test_search_by_image_ignores_processing_images(aws_resources):
+    table = aws_resources['table']
+    _seed(table, [
+        {
+            'ImageURL': 'https://bucket.s3.amazonaws.com/dog-processing.jpg',
+            'Tags': [{'tag': 'dog', 'count': 1}],
+            'UserID': USER_ID,
+            'UploadedAt': '2024-01-01T00:00:00Z',
+            'ProcessingStatus': 'processing',
+        },
+    ])
+
+    mock_rekog = MagicMock()
+    mock_rekog.detect_labels.return_value = MOCK_LABELS
+    mock_rekog.exceptions.InvalidImageException = Exception
+
+    with patch('boto3.client', return_value=mock_rekog):
+        handler = get_handler()
+        resp = handler(_event(), {})
+
+    assert resp['statusCode'] == 404

@@ -23,6 +23,11 @@ def test_upload_valid_jpeg(aws_resources):
     assert resp['statusCode'] == 200
     body = json.loads(resp['body'])
     assert 'url' in body
+    assert body['processingStatus'] == 'processing'
+
+    stored = aws_resources['table'].get_item(Key={'ImageURL': body['url']})['Item']
+    assert stored['ProcessingStatus'] == 'processing'
+    assert stored['Tags'] == []
 
 
 def test_upload_missing_fields(aws_resources):

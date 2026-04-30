@@ -2,8 +2,22 @@ import json
 import os
 import logging
 import urllib.parse
-from datetime import datetime, timezone
 import boto3
+
+try:
+    from backend.image_records import (
+        image_url_for_s3_object,
+        mark_image_record_failed,
+        mark_image_record_ready,
+        tags_from_rekognition_labels,
+    )
+except ModuleNotFoundError:
+    from image_records import (
+        image_url_for_s3_object,
+        mark_image_record_failed,
+        mark_image_record_ready,
+        tags_from_rekognition_labels,
+    )
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -19,6 +33,7 @@ def lambda_handler(event, context):
     record = event['Records'][0]
     bucket = record['s3']['bucket']['name']
     key = urllib.parse.unquote_plus(record['s3']['object']['key'])
+    image_url = image_url_for_s3_object(bucket, key)
 
     logger.info({'action': 'object_detection_start', 'bucket': bucket, 'key': key})
 
@@ -30,33 +45,14 @@ def lambda_handler(event, context):
         )
     except Exception as e:
         logger.error({'action': 'rekognition_error', 'error': str(e), 'key': key})
+        _mark_failed(image_url, key, str(e))
         raise
 
-    tags = [
-        {'tag': label['Name'].lower(), 'count': 1}
-        for label in response['Labels']
-    ]
-
-    image_url = f'https://{bucket}.s3.amazonaws.com/{key}'
-
-    # user_id is the first path segment: {user_id}/{uuid}_{filename}
-    user_id = key.split('/')[0] if '/' in key else 'unknown'
+    tags = tags_from_rekognition_labels(response['Labels'])
 
     table = dynamodb.Table(TABLE_NAME)
     try:
-        table.update_item(
-            Key={'ImageURL': image_url},
-            UpdateExpression=(
-                'SET Tags = :tags, '
-                'UserID = if_not_exists(UserID, :uid), '
-                'UploadedAt = if_not_exists(UploadedAt, :ts)'
-            ),
-            ExpressionAttributeValues={
-                ':tags': tags,
-                ':uid': user_id,
-                ':ts': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f'),
-            },
-        )
+        mark_image_record_ready(table, image_url, key, tags)
     except Exception as e:
         logger.error({'action': 'dynamodb_error', 'error': str(e), 'key': key})
         raise
@@ -64,3 +60,11 @@ def lambda_handler(event, context):
     logger.info({'action': 'object_detection_done', 'key': key, 'tag_count': len(tags)})
 
     return {'statusCode': 200, 'body': 'Object detection completed'}
+
+
+def _mark_failed(image_url: str, key: str, error: str) -> None:
+    table = dynamodb.Table(TABLE_NAME)
+    try:
+        mark_image_record_failed(table, image_url, key, error)
+    except Exception as ddb_error:
+        logger.error({'action': 'dynamodb_mark_failed_error', 'error': str(ddb_error), 'key': key})

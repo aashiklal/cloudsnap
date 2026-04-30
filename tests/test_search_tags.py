@@ -19,8 +19,14 @@ def _event(params):
     }
 
 
-def _seed(table, url, tags):
-    table.put_item(Item={'ImageURL': url, 'Tags': tags, 'UserID': USER_ID, 'UploadedAt': '2024-01-01T00:00:00Z'})
+def _seed(table, url, tags, status='ready'):
+    table.put_item(Item={
+        'ImageURL': url,
+        'Tags': tags,
+        'UserID': USER_ID,
+        'UploadedAt': '2024-01-01T00:00:00Z',
+        'ProcessingStatus': status,
+    })
 
 
 def test_search_returns_matching_image(aws_resources):
@@ -61,3 +67,15 @@ def test_search_invalid_tag_value(aws_resources):
     handler = _handler()
     resp = handler(_event({'tag1': 'inv@lid!', 'tag1count': '2'}), {})
     assert resp['statusCode'] == 400
+
+
+def test_search_ignores_processing_images(aws_resources):
+    _seed(
+        aws_resources['table'],
+        'https://example.com/cat-processing.jpg',
+        [{'tag': 'cat', 'count': 3}],
+        status='processing',
+    )
+    handler = _handler()
+    resp = handler(_event({'tag1': 'cat', 'tag1count': '1'}), {})
+    assert resp['statusCode'] == 404

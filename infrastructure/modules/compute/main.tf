@@ -1,8 +1,9 @@
 locals {
   functions = {
     upload = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/upload"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/upload"
+      shared_sources = ["http_api.py", "image_records.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -17,8 +18,9 @@ locals {
       ]
     }
     search-tags = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/search-tags"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/search-tags"
+      shared_sources = ["http_api.py", "image_records.py", "tag_commands.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -33,8 +35,9 @@ locals {
       ]
     }
     modify-tags = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/modify-tags"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/modify-tags"
+      shared_sources = ["http_api.py", "image_records.py", "tag_commands.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -44,8 +47,9 @@ locals {
       ]
     }
     delete = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/delete"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/delete"
+      shared_sources = ["http_api.py", "image_records.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -60,8 +64,9 @@ locals {
       ]
     }
     object-detection = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/object-detection"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/object-detection"
+      shared_sources = ["image_records.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -81,8 +86,9 @@ locals {
       ]
     }
     search-by-image = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/search-by-image"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/search-by-image"
+      shared_sources = ["http_api.py", "image_records.py", "tag_commands.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -102,8 +108,9 @@ locals {
       ]
     }
     list-images = {
-      handler     = "lambda_function.lambda_handler"
-      source_path = "${path.root}/../backend/list-images"
+      handler        = "lambda_function.lambda_handler"
+      source_path    = "${path.root}/../backend/list-images"
+      shared_sources = ["http_api.py", "image_records.py"]
       extra_policy_statements = [
         {
           effect    = "Allow"
@@ -187,8 +194,23 @@ resource "aws_cloudwatch_log_group" "lambda" {
 data "archive_file" "lambda" {
   for_each    = local.functions
   type        = "zip"
-  source_dir  = each.value.source_path
   output_path = "${path.module}/builds/${each.key}.zip"
+
+  dynamic "source" {
+    for_each = fileset(each.value.source_path, "*")
+    content {
+      content  = file("${each.value.source_path}/${source.value}")
+      filename = source.value
+    }
+  }
+
+  dynamic "source" {
+    for_each = each.value.shared_sources
+    content {
+      content  = file("${path.root}/../backend/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 # Upload all packages to S3 — avoids the 70MB direct-upload limit for large Lambdas

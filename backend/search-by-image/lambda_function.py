@@ -3,21 +3,42 @@ import os
 import base64
 import logging
 import boto3
-from boto3.dynamodb.conditions import Key
+
+try:
+    from backend.http_api import (
+        cors_headers,
+        error_response,
+        is_preflight_request,
+        json_response,
+        preflight_response,
+        user_id_from_event,
+    )
+    from backend.image_records import (
+        query_library_user_image_records,
+        search_ready_image_records,
+    )
+    from backend.tag_commands import has_any_tag
+except ModuleNotFoundError:
+    from http_api import (
+        cors_headers,
+        error_response,
+        is_preflight_request,
+        json_response,
+        preflight_response,
+        user_id_from_event,
+    )
+    from image_records import (
+        query_library_user_image_records,
+        search_ready_image_records,
+    )
+    from tag_commands import has_any_tag
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 TABLE_NAME = os.environ['TABLE_NAME']
 BUCKET_NAME = os.environ['BUCKET_NAME']
-ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', '*')
-PRESIGN_EXPIRY = 3600
-
-CORS_HEADERS = {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST',
-}
+CORS_HEADERS = cors_headers('OPTIONS,POST')
 
 dynamodb = boto3.resource('dynamodb')
 rekognition = boto3.client('rekognition')
@@ -27,11 +48,10 @@ MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Rekognition Image.Bytes limit is 5 MB; Lamb
 
 
 def lambda_handler(event, context):
-    if (event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS'):
-        return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
+    if is_preflight_request(event):
+        return preflight_response(CORS_HEADERS)
 
-    claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
-    user_id = claims.get('sub', 'unknown')
+    user_id = user_id_from_event(event)
 
     try:
         raw_body = event.get('body', '')
@@ -68,48 +88,21 @@ def lambda_handler(event, context):
     logger.info({'action': 'search_by_image_tags', 'tags': list(query_tags)})
 
     table = dynamodb.Table(TABLE_NAME)
-    matching_urls = []
+    records = query_library_user_image_records(table, user_id)
+    results = search_ready_image_records(
+        records,
+        lambda record: has_any_tag(record.get('Tags', []), query_tags),
+        s3,
+        BUCKET_NAME,
+    )
 
-    query_kwargs = {
-        'IndexName': 'UserID-UploadedAt-index',
-        'KeyConditionExpression': Key('UserID').eq(user_id),
-    }
-    while True:
-        response = table.query(**query_kwargs)
-        for item in response.get('Items', []):
-            item_tag_names = {t['tag'].lower() for t in item.get('Tags', [])}
-            if query_tags & item_tag_names:
-                matching_urls.append(item['ImageURL'])
-        if 'LastEvaluatedKey' not in response:
-            break
-        query_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+    logger.info({'action': 'search_by_image_done', 'results': len(results)})
 
-    logger.info({'action': 'search_by_image_done', 'results': len(matching_urls)})
-
-    if not matching_urls:
+    if not results:
         return _error(404, 'No matching images found')
 
-    prefix = f'https://{BUCKET_NAME}.s3.amazonaws.com/'
-    results = []
-    for image_url in matching_urls:
-        key = image_url[len(prefix):] if image_url.startswith(prefix) else image_url
-        presigned = s3.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': key},
-            ExpiresIn=PRESIGN_EXPIRY,
-        )
-        results.append({'imageUrl': image_url, 'presignedUrl': presigned})
-
-    return {
-        'statusCode': 200,
-        'headers': CORS_HEADERS,
-        'body': json.dumps(results),
-    }
+    return json_response(200, results, CORS_HEADERS)
 
 
 def _error(status: int, message: str) -> dict:
-    return {
-        'statusCode': status,
-        'headers': CORS_HEADERS,
-        'body': json.dumps({'error': message}),
-    }
+    return error_response(status, message, CORS_HEADERS)

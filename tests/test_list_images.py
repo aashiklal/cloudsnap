@@ -87,3 +87,14 @@ def test_list_images_returns_tags(aws_resources):
     match = next((i for i in body if i['ImageURL'].endswith('c.jpg')), None)
     assert match is not None
     assert match['Tags'][0]['tag'] == 'person'
+
+
+def test_list_images_defaults_missing_processing_status_to_ready(aws_resources):
+    table = aws_resources['table']
+    _seed(table, [
+        {'ImageURL': 'https://bucket.s3.amazonaws.com/legacy.jpg', 'Tags': [], 'UserID': USER_ID, 'UploadedAt': '2024-01-01T00:00:00Z'},
+    ])
+    handler = get_handler()
+    resp = handler(_auth_event(), {})
+    body = json.loads(resp['body'])
+    assert body[0]['ProcessingStatus'] == 'ready'

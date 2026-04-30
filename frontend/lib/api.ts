@@ -1,5 +1,6 @@
 import type { UploadResult, TagInput, SearchResult } from '@/lib/types';
 import { getAuthToken, clearTokenCache } from '@/lib/auth';
+import { toModifyTagCommand, toSearchTagCommand, type TagMutationType } from '@/lib/tagCommands';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 if (!API_BASE) throw new Error('NEXT_PUBLIC_API_URL is not configured');
@@ -52,11 +53,7 @@ export async function uploadImage(file: File): Promise<UploadResult> {
 }
 
 export async function searchByTags(tags: TagInput[]): Promise<SearchResult[]> {
-  const params = new URLSearchParams();
-  tags.forEach((t, i) => {
-    params.append(`tag${i + 1}`, t.name);
-    params.append(`tag${i + 1}count`, t.count);
-  });
+  const params = toSearchTagCommand(tags);
   return request<SearchResult[]>(`/search?${params.toString()}`, { method: 'GET' });
 }
 
@@ -104,14 +101,10 @@ export async function searchByImage(file: File): Promise<SearchResult[]> {
 
 export async function modifyTags(
   url: string,
-  type: '0' | '1',
+  type: TagMutationType,
   tags: TagInput[]
 ): Promise<{ message: string }> {
-  const body: Record<string, string | number> = { url, type };
-  tags.forEach((t, i) => {
-    body[`tag${i + 1}`] = t.name;
-    body[`tag${i + 1}count`] = parseInt(t.count, 10);
-  });
+  const body = toModifyTagCommand(url, type, tags);
   return request<{ message: string }>('/modify-tags', {
     method: 'POST',
     body: JSON.stringify(body),

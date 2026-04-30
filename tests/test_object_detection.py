@@ -59,6 +59,9 @@ def test_object_detection_stores_tags(aws_resources):
     tag_names = {t['tag'] for t in tags}
     assert 'dog' in tag_names
     assert 'animal' in tag_names
+    assert result['Item']['ProcessingStatus'] == 'ready'
+    assert result['Item']['ProcessingError'] == ''
+    assert 'ProcessedAt' in result['Item']
 
 
 def test_object_detection_rekognition_called_with_correct_args(aws_resources):
@@ -101,3 +104,9 @@ def test_object_detection_rekognition_error_raises(aws_resources):
         handler = get_handler()
         with pytest.raises(Exception, match='Rekognition unavailable'):
             handler(_s3_event(), {})
+
+    table = aws_resources['table']
+    image_url = f'https://{BUCKET_NAME}.s3.amazonaws.com/photo.jpg'
+    result = table.get_item(Key={'ImageURL': image_url})
+    assert result['Item']['ProcessingStatus'] == 'failed'
+    assert result['Item']['ProcessingError'] == 'Rekognition unavailable'
